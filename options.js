@@ -905,6 +905,7 @@ function bulkDeleteFields() {
       domains.forEach(domain => {
         if (domain.specificFields && Array.isArray(domain.specificFields)) {
           domain.specificFields = domain.specificFields.filter(id => !fieldIdsToDelete.includes(id));
+        }
         ```
         }
       });
@@ -1875,7 +1876,135 @@ function setupEventListeners() {
       // Reset all filter inputs
       const inputs = [
         'field-search',
-        'filter-by-usage', 
+        'filter-by-usage',
         'filter-by-type',
         'filter-selector-contains',
         'filter-value-contains',
+        'filter-domain-contains'
+      ];
+
+      inputs.forEach(inputId => {
+        const element = document.getElementById(inputId);
+        if (element) {
+          if (element.type === 'checkbox') {
+            element.checked = false;
+          } else if (element.tagName === 'SELECT') {
+            element.selectedIndex = 0;
+          } else {
+            element.value = '';
+          }
+        }
+      });
+
+      // Reset sort state
+      currentSort = { column: null, direction: 'asc' };
+      updateSortHeaders();
+
+      // Reapply filters
+      applyFilters();
+
+      showNotification('All filters cleared!', 'info');
+    });
+  }
+
+  // Setup sortable headers
+  setupSortableHeaders();
+
+  // Header select all checkbox
+  const headerSelectAll = document.getElementById('header-select-all');
+  if (headerSelectAll) {
+    headerSelectAll.addEventListener('change', toggleAllFieldCheckboxes);
+  }
+
+  // Bulk action buttons
+  const bulkDeleteBtn = document.getElementById('bulk-delete-fields');
+  if (bulkDeleteBtn) {
+    bulkDeleteBtn.addEventListener('click', bulkDeleteFields);
+  }
+
+  const bulkRestrictBtn = document.getElementById('bulk-restrict-fields');
+  if (bulkRestrictBtn) {
+    bulkRestrictBtn.addEventListener('click', bulkRestrictFields);
+  }
+
+  const bulkUnrestrictBtn = document.getElementById('bulk-unrestrict-fields');
+  if (bulkUnrestrictBtn) {
+    bulkUnrestrictBtn.addEventListener('click', bulkUnrestrictFields);
+  }
+
+  // Settings save button
+  const saveSettingsBtn = document.getElementById('save-settings');
+  if (saveSettingsBtn) {
+    saveSettingsBtn.addEventListener('click', saveSettings);
+  }
+
+  // Export/Import buttons
+  const exportAllBtn = document.getElementById('export-all-data');
+  if (exportAllBtn) {
+    exportAllBtn.addEventListener('click', exportAllData);
+  }
+
+  const importAllBtn = document.getElementById('import-all-data');
+  if (importAllBtn) {
+    importAllBtn.addEventListener('click', function() {
+      const importFileElement = document.getElementById('import-file');
+      if (importFileElement) {
+        importFileElement.click();
+      }
+    });
+  }
+
+  const importFileElement = document.getElementById('import-file');
+  if (importFileElement) {
+    importFileElement.addEventListener('change', importData);
+  }
+
+  // Survey management buttons
+  const clearSurveyBtn = document.getElementById('clear-survey-history');
+  if (clearSurveyBtn) {
+    clearSurveyBtn.addEventListener('click', clearSurveyHistory);
+  }
+
+  const exportSurveyBtn = document.getElementById('export-survey-data');
+  if (exportSurveyBtn) {
+    exportSurveyBtn.addEventListener('click', exportSurveyHistory);
+  }
+
+  const markCompletedBtn = document.getElementById('mark-current-completed');
+  if (markCompletedBtn) {
+    markCompletedBtn.addEventListener('click', function() {
+      chrome.runtime.sendMessage({action: 'markCurrentSurveyCompleted'}, function(response) {
+        if (response && response.status === 'success') {
+          showNotification(response.message, 'success');
+          loadSurveyData();
+        } else {
+          showNotification(response?.message || 'Error marking survey as completed', 'error');
+        }
+      });
+    });
+  }
+
+  // Clear logs button
+  const clearLogsBtn = document.getElementById('clear-logs');
+  if (clearLogsBtn) {
+    clearLogsBtn.addEventListener('click', clearLogs);
+  }
+
+  // Reset all data button
+  const resetAllBtn = document.getElementById('reset-all-data');
+  if (resetAllBtn) {
+    resetAllBtn.addEventListener('click', resetAllData);
+  }
+
+  // Add domain button
+  const addDomainBtn = document.getElementById('add-domain');
+  if (addDomainBtn) {
+    addDomainBtn.addEventListener('click', addDomain);
+  }
+
+  // Domain search
+  const domainSearchElement = document.getElementById('domain-search');
+  if (domainSearchElement) {
+    domainSearchElement.addEventListener('input', searchDomains);
+  }
+}

@@ -29,7 +29,7 @@ setInterval(() => {
       debugLog(`Cleaned up old survey for tab ${tabId}`);
     }
   }
-  
+
   // Limit active surveys size
   if (activeSurveys.size > MAX_ACTIVE_SURVEYS) {
     const entries = Array.from(activeSurveys.entries());
@@ -38,7 +38,7 @@ setInterval(() => {
     toRemove.forEach(([tabId]) => activeSurveys.delete(tabId));
     debugLog(`Cleaned up ${toRemove.length} old active surveys`);
   }
-  
+
   // Limit pending notifications
   if (pendingNotifications.size > MAX_PENDING_NOTIFICATIONS) {
     const entries = Array.from(pendingNotifications.entries());
@@ -109,7 +109,7 @@ const MessageHandlers = {
     const data = await StorageManager.get(['completedSurveys', 'inProgressSurveys']);
     const completed = data.completedSurveys || [];
     const inProgress = data.inProgressSurveys || [];
-    
+
     return {
       status: 'success',
       stats: {
@@ -131,7 +131,7 @@ const MessageHandlers = {
 // Unified message listener
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   const handler = MessageHandlers[request.action];
-  
+
   if (handler) {
     const result = handler(request, sender);
     if (result instanceof Promise) {
@@ -189,7 +189,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     });
     return true;
   }
-  
+
   // Domain auto-fill functionality
   else if (request.action === 'checkDomainAutoFill') {
     const url = request.url;
@@ -197,21 +197,21 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       sendResponse({status: 'error', message: 'No URL provided'});
       return true;
     }
-    
+
     checkDomainAutoFill(url)
       .then(result => sendResponse(result))
       .catch(error => sendResponse({status: 'error', message: error.message}));
     return true;
   }
-  
+
   // Survey tracking functionality
   else if (request.action === 'getSurveyStats') {
     chrome.storage.local.get(['completedSurveys', 'inProgressSurveys'], function(data) {
       const completed = data.completedSurveys || [];
       const inProgress = data.inProgressSurveys || [];
-      
+
       console.log('getSurveyStats - completed:', completed.length, 'inProgress:', inProgress.length);
-      
+
       sendResponse({
         status: 'success',
         stats: {
@@ -224,16 +224,16 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     });
     return true;
   }
-  
+
   else if (request.action === 'getSurveyQueue') {
     sendResponse({status: 'success', queue: surveyQueue});
     return true;
   }
-  
+
   else if (request.action === 'confirmSurveyInProgress') {
     const { surveyData, selectedSegment } = request;
     console.log('confirmSurveyInProgress called with:', { surveyData, selectedSegment });
-    
+
     // Use selected segment as the survey ID if provided
     if (selectedSegment) {
       console.log('Original survey ID:', surveyData.id);
@@ -242,23 +242,23 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       surveyData.selectedSegment = selectedSegment;
       console.log('Updated survey ID:', surveyData.id);
     }
-    
+
     markSurveyInProgress(surveyData);
-    
+
     // Remove from queue
     surveyQueue = surveyQueue.filter(s => s.tabId !== surveyData.tabId);
-    
+
     sendResponse({status: 'success'});
     return true;
   }
-  
+
   else if (request.action === 'getInProgressSurveys') {
     chrome.storage.local.get('inProgressSurveys', function(data) {
       sendResponse({status: 'success', surveys: data.inProgressSurveys || []});
     });
     return true;
   }
-  
+
   else if (request.action === 'markSurveyCompleted') {
     console.log('=== markSurveyCompleted REQUEST ===');
     const { surveyId } = request;
@@ -267,21 +267,21 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     sendResponse({status: 'success'});
     return true;
   }
-  
+
   else if (request.action === 'removeSurveyFromInProgress') {
     const { surveyId } = request;
     removeFromInProgress(surveyId);
     sendResponse({status: 'success'});
     return true;
   }
-  
+
   else if (request.action === 'dismissSurveyFromQueue') {
     const { tabId } = request;
     surveyQueue = surveyQueue.filter(s => s.tabId !== tabId);
     sendResponse({status: 'success'});
     return true;
   }
-  
+
   else if (request.action === 'getCurrentTabSurvey') {
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
       if (tabs[0]) {
@@ -293,20 +293,20 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     });
     return true;
   }
-  
+
   else if (request.action === 'clearSurveyHistory') {
     chrome.storage.local.set({completedSurveys: [], inProgressSurveys: []}, function() {
       sendResponse({status: 'success', message: 'Survey history cleared'});
     });
     return true;
   }
-  
+
   else if (request.action === 'cleanupInvalidSurveys') {
     cleanupInvalidSurveys();
     sendResponse({status: 'success', message: 'Invalid surveys cleaned up'});
     return true;
   }
-  
+
   else if (request.action === 'markCurrentSurveyCompleted') {
     console.log('=== markCurrentSurveyCompleted REQUEST ===');
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
@@ -315,26 +315,26 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         sendResponse({status: 'error', message: 'No active tab'});
         return;
       }
-      
+
       const tab = tabs[0];
       console.log('Current tab URL:', tab.url);
       console.log('Current tab title:', tab.title);
-      
+
       // First check if this is already a completed survey to avoid duplicates
       chrome.storage.local.get('completedSurveys', function(data) {
         const completedSurveys = data.completedSurveys || [];
-        
+
         // Try to detect survey from current page first - check if domain has autofill
         chrome.storage.local.get('domains', function(domainData) {
           const domains = domainData.domains || [];
           const domain = new URL(tab.url).hostname;
           const hasAutofillDomain = domains.some(d => d.domain === domain && d.enabled);
-          
+
           let surveyInfo = detectSurveyPage(tab.url, tab.title, hasAutofillDomain);
           console.log('Detected survey info:', surveyInfo);
-        
+
           let surveyData;
-        
+
           if (surveyInfo) {
             // Check if this survey ID already exists in completed surveys
             const existingSurvey = completedSurveys.find(s => s.id === surveyInfo.id);
@@ -343,7 +343,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
               sendResponse({status: 'error', message: 'This survey is already marked as completed'});
               return;
             }
-            
+
             surveyData = {
               ...surveyInfo,
               tabId: tab.id,
@@ -355,7 +355,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
             // If no survey detected, create a generic one with unique ID
             console.log('No survey detected, creating generic survey entry');
             const genericId = 'manual_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-            
+
             surveyData = {
               id: genericId,
               url: tab.url,
@@ -368,7 +368,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
               detectionSource: 'manual'
             };
           }
-          
+
           console.log('Marking survey as completed:', surveyData);
           markSurveyCompleted(surveyData);
           sendResponse({status: 'success', message: surveyData.platform ? `${surveyData.platform} survey marked as completed` : 'Page marked as completed survey'});
@@ -377,7 +377,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     });
     return true;
   }
-  
+
   // DEBUGGING: Enable debug mode immediately for troubleshooting
   else if (request.action === 'enableDebugMode') {
     chrome.storage.local.set({debugMode: true, options: {debugMode: true}}, function() {
@@ -385,7 +385,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     });
     return true;
   }
-  
+
   // Export data to extension working directory
   else if (request.action === 'exportToWorkingDir') {
     exportDataToWorkingDir(request.data)
@@ -393,7 +393,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       .catch(error => sendResponse({status: 'error', message: error.message}));
     return true;
   }
-  
+
   // Import data from extension working directory
   else if (request.action === 'importFromWorkingDir') {
     importDataFromWorkingDir()
@@ -401,20 +401,20 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       .catch(error => sendResponse({status: 'error', message: error.message}));
     return true;
   }
-  
+
   // NEW: Iframe support toggle
   else if (request.action === 'toggleIframeSupport') {
     chrome.storage.local.get('options', function(data) {
       const options = data.options || {};
       options.iframeSupportEnabled = request.enabled;
-      
+
       chrome.storage.local.set({options: options}, function() {
         sendResponse({status: 'success', enabled: options.iframeSupportEnabled});
       });
     });
     return true;
   }
-  
+
   // DEBUGGING: Test survey detection function
   else if (request.action === 'testSurveyDetection') {
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
@@ -430,7 +430,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     });
     return true;
   }
-  
+
   // NEW: Delete specific survey
   else if (request.action === 'deleteSurvey') {
     const { surveyId, surveyType } = request;
@@ -439,7 +439,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       .catch(error => sendResponse({status: 'error', message: error.message}));
     return true;
   }
-  
+
   // NEW: Bulk delete surveys
   else if (request.action === 'bulkDeleteSurveys') {
     const { surveyIds, surveyType } = request;
@@ -448,24 +448,24 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       .catch(error => sendResponse({status: 'error', message: error.message}));
     return true;
   }
-  
+
   return true;
 });
 
 // Handle tab activation - show pending notifications AND check for surveys when tab is actually viewed
 chrome.tabs.onActivated.addListener(function(activeInfo) {
   const tabId = activeInfo.tabId;
-  
+
   console.log('🔄 TAB ACTIVATED:', tabId);
-  
+
   // Check if this tab has a pending notification
   if (pendingNotifications.has(tabId)) {
     const notificationData = pendingNotifications.get(tabId);
     console.log('Tab activated, showing pending notification for tab:', tabId);
-    
+
     // Show the notification now that the tab is being viewed
     showSurveyAutofilledNotification(tabId, notificationData);
-    
+
     // Remove from pending notifications
     pendingNotifications.delete(tabId);
   } else {
@@ -475,11 +475,11 @@ chrome.tabs.onActivated.addListener(function(activeInfo) {
         console.log('Tab no longer exists:', tabId);
         return;
       }
-      
+
       if (tab && tab.url && tab.url.startsWith('http')) {
         console.log('🔍 === TAB ACTIVATED - CHECKING FOR SURVEYS ===');
         console.log('🌐 Activated tab URL:', tab.url);
-        
+
         // Check if we already have survey data for this tab
         if (!activeSurveys.has(tabId)) {
           console.log('📝 No existing survey data, performing detection');
@@ -498,14 +498,14 @@ chrome.tabs.onActivated.addListener(function(activeInfo) {
 // Handle tab updates for auto-fill and survey tracking - COORDINATED to prevent duplicate notifications
 chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
   if (changeInfo.status === 'complete' && tab.url && tab.url.startsWith('http')) {
-    
+
     // FORCE DEBUG LOGGING FOR TROUBLESHOOTING
     console.log('🚨 TAB UPDATE - URL:', tab.url);
     console.log('🚨 TAB UPDATE - changeInfo:', changeInfo);
-    
+
     debugLog('=== TAB UPDATE ===');
     debugLog('Tab completed loading:', tab.url);
-    
+
     // COORDINATED: Single function handles both autofill and survey tracking
     setTimeout(() => {
       performCoordinatedAutoFillAndSurveyHandling(tabId, tab);
@@ -523,27 +523,27 @@ async function checkDomainAutoFill(url) {
   } catch (error) {
     return {status: 'error', message: 'Invalid URL'};
   }
-  
+
   return new Promise((resolve) => {
     chrome.storage.local.get(['domains', 'fields'], function(data) {
       const domains = data.domains || [];
       const fields = data.fields || [];
-      
+
       const matchingDomain = domains.find(d => {
         console.log(`Checking domain match: "${domain}" against registered "${d.domain}"`);
-        
+
         // Exact match
         if (d.domain === domain) {
           console.log('✓ Exact domain match found');
           return true;
         }
-        
+
         // Wildcard match (*.example.com matches subdomain.example.com)
         if (d.domain.startsWith('*.') && domain.endsWith(d.domain.substring(1))) {
           console.log('✓ Wildcard domain match found');
           return true;
         }
-        
+
         // Proper subdomain matching - ensure it's a real subdomain, not just a substring
         // This prevents false positives like "pi" matching "opinari.fieldwork.com"
         if (d.domain.includes('.') && domain.includes('.')) {
@@ -552,38 +552,38 @@ async function checkDomainAutoFill(url) {
             console.log('✓ Subdomain match found (current is subdomain of registered)');
             return true;
           }
-          
+
           // Check if registered domain is a subdomain of current domain  
           if (d.domain.endsWith('.' + domain)) {
             console.log('✓ Subdomain match found (registered is subdomain of current)');
             return true;
           }
         }
-        
+
         return false;
       });
-      
+
       if (matchingDomain && matchingDomain.enabled) {
         console.log(`✓ Domain autofill enabled for: ${matchingDomain.domain}`);
-        
+
         // FIXED: For "Specific Fields Only", check if there are actually matching fields
         let shouldFill = true;
         let specificFields = matchingDomain.specificFields || [];
-        
+
         if (!matchingDomain.fillAllFields && specificFields.length > 0) {
           // Check if any of the specific fields actually exist in our fields list
           const matchingFields = fields.filter(field => specificFields.includes(field.id));
           console.log(`Domain configured for specific fields: ${specificFields.length} specified, ${matchingFields.length} exist`);
-          
+
           // Only set shouldFill to false if NO matching fields exist
           shouldFill = matchingFields.length > 0;
-          
+
           if (!shouldFill) {
             console.log('⚠️ Domain configured for specific fields but none exist - treating as enabled for survey detection');
             // Still return the domain info for survey detection purposes
           }
         }
-        
+
         resolve({
           status: 'success',
           shouldFill: shouldFill,
@@ -604,22 +604,22 @@ async function checkDomainAutoFill(url) {
 function deleteSurvey(surveyId, surveyType) {
   return new Promise((resolve) => {
     console.log(`Deleting ${surveyType} survey:`, surveyId);
-    
+
     const storageKey = surveyType === 'completed' ? 'completedSurveys' : 'inProgressSurveys';
-    
+
     chrome.storage.local.get(storageKey, function(data) {
       const surveys = data[storageKey] || [];
       const originalLength = surveys.length;
-      
+
       // Filter out the survey with matching ID
       const updatedSurveys = surveys.filter(survey => survey.id !== surveyId);
-      
+
       if (updatedSurveys.length === originalLength) {
         console.log(`Survey ${surveyId} not found in ${surveyType} surveys`);
         resolve({status: 'error', message: 'Survey not found'});
         return;
       }
-      
+
       // Save updated surveys
       chrome.storage.local.set({[storageKey]: updatedSurveys}, function() {
         if (chrome.runtime.lastError) {
@@ -638,23 +638,23 @@ function deleteSurvey(surveyId, surveyType) {
 function bulkDeleteSurveys(surveyIds, surveyType) {
   return new Promise((resolve) => {
     console.log(`Bulk deleting ${surveyIds.length} ${surveyType} surveys:`, surveyIds);
-    
+
     const storageKey = surveyType === 'completed' ? 'completedSurveys' : 'inProgressSurveys';
-    
+
     chrome.storage.local.get(storageKey, function(data) {
       const surveys = data[storageKey] || [];
       const originalLength = surveys.length;
-      
+
       // Filter out surveys with matching IDs
       const updatedSurveys = surveys.filter(survey => !surveyIds.includes(survey.id));
       const deletedCount = originalLength - updatedSurveys.length;
-      
+
       if (deletedCount === 0) {
         console.log(`No surveys found to delete from ${surveyType} surveys`);
         resolve({status: 'error', message: 'No surveys found to delete'});
         return;
       }
-      
+
       // Save updated surveys
       chrome.storage.local.set({[storageKey]: updatedSurveys}, function() {
         if (chrome.runtime.lastError) {
@@ -674,7 +674,7 @@ async function performCoordinatedAutoFillAndSurveyHandling(tabId, tab) {
   try {
     console.log('=== performCoordinatedAutoFillAndSurveyHandling START ===');
     console.log('TabId:', tabId, 'URL:', tab.url, 'isActive:', tab.active);
-    
+
     if (!tab || !tab.url) {
       console.log('Tab invalid or has no URL:', tabId);
       return;
@@ -684,11 +684,11 @@ async function performCoordinatedAutoFillAndSurveyHandling(tabId, tab) {
     const domainResult = await checkDomainAutoFill(tab.url);
     const hasAutofillDomain = domainResult.status === 'success' && domainResult.shouldFill;
     const isDomainConfigured = domainResult.status === 'success' && domainResult.domain;
-    
+
     console.log('🔍 Domain check result for', tab.url);
     console.log('- hasAutofillDomain (fields to fill):', hasAutofillDomain);
     console.log('- isDomainConfigured (in domain list):', isDomainConfigured);
-    
+
     // STEP 2: Only detect surveys on configured domains
     let surveyInfo = null;
     if (isDomainConfigured) {
@@ -697,7 +697,7 @@ async function performCoordinatedAutoFillAndSurveyHandling(tabId, tab) {
     } else {
       console.log('❌ Domain not in autofill list, skipping survey detection');
     }
-    
+
     if (surveyInfo) {
       console.log('🎉 *** SURVEY DETECTED ***:', surveyInfo);
       // Store survey info for this tab
@@ -714,10 +714,10 @@ async function performCoordinatedAutoFillAndSurveyHandling(tabId, tab) {
     // STEP 3: Check for duplicates AND check if survey key exists in URL
     let isDuplicateSurvey = false;
     let duplicateDetails = null;
-    
+
     if (surveyInfo) {
       console.log('Checking for survey duplicates...');
-      
+
       // First check if any existing survey key is in the current URL
       const existingSurveyKey = await checkForExistingSurveyKeyInUrl(tab.url);
       if (existingSurveyKey) {
@@ -729,10 +729,10 @@ async function performCoordinatedAutoFillAndSurveyHandling(tabId, tab) {
         duplicateDetails = await checkForDuplicateSurvey(surveyInfo.id);
         isDuplicateSurvey = !!duplicateDetails;
       }
-      
+
       console.log('Duplicate check result:', isDuplicateSurvey, duplicateDetails);
     }
-    
+
     // STEP 4: Handle surveys based on duplicate status
     if (surveyInfo) {
       if (isDuplicateSurvey) {
@@ -741,7 +741,7 @@ async function performCoordinatedAutoFillAndSurveyHandling(tabId, tab) {
       } else {
         // Handle NEW survey - show purple notification
         console.log('*** NEW SURVEY - PROCEEDING WITH PURPLE NOTIFICATION ***');
-        
+
         if (hasAutofillDomain) {
           // NEW survey with autofill capability - proceed with autofill + purple notification
           console.log('🔧 Processing domain with autofill + purple notification');
@@ -759,7 +759,7 @@ async function performCoordinatedAutoFillAndSurveyHandling(tabId, tab) {
     } else {
       console.log('💭 No survey and no autofill - no action taken');
     }
-    
+
   } catch (error) {
     console.error("Error in performCoordinatedAutoFillAndSurveyHandling:", error);
   }
@@ -788,22 +788,22 @@ function convertEpochToReadableDate(epochTimestamp) {
 async function handleKnownSurvey(tabId, duplicateDetails) {
   console.log('*** KNOWN SURVEY DETECTED - SHOWING UNOBTRUSIVE MESSAGE ***');
   console.log('Survey details:', duplicateDetails);
-  
+
   const survey = duplicateDetails;
   let message = '';
-  
+
   if (survey.status === 'completed') {
     // Convert epoch to readable date
     const completedDate = new Date(survey.completedAt);
     const dateStr = completedDate.toLocaleDateString();
     const timeStr = completedDate.toLocaleTimeString();
-    
+
     message = `✅ Survey "${survey.id}" already completed on ${dateStr} at ${timeStr}`;
-    
+
     // Update encounter count
     survey.duplicateEncounters = (survey.duplicateEncounters || 0) + 1;
     survey.lastEncountered = Date.now();
-    
+
     const completedSurveys = await getCompletedSurveys();
     const updatedSurveys = completedSurveys.map(s => s.id === survey.id ? survey : s);
     await chrome.storage.local.set({completedSurveys: updatedSurveys});
@@ -812,19 +812,19 @@ async function handleKnownSurvey(tabId, duplicateDetails) {
     const startedDate = new Date(survey.startedAt);
     const dateStr = startedDate.toLocaleDateString();
     const timeStr = startedDate.toLocaleTimeString();
-    
+
     message = `📝 Survey "${survey.id}" in progress (started ${dateStr} at ${timeStr})`;
-    
+
     // Update last active time
     survey.lastActiveAt = Date.now();
-    
+
     const inProgressSurveys = await getInProgressSurveys();
     const updatedSurveys = inProgressSurveys.map(s => s.id === survey.id ? survey : s);
     await chrome.storage.local.set({inProgressSurveys: updatedSurveys});
   }
-  
+
   console.log('Attempting to show notification:', message);
-  
+
   // First inject content script to ensure it's available
   try {
     await chrome.scripting.executeScript({
@@ -835,7 +835,7 @@ async function handleKnownSurvey(tabId, duplicateDetails) {
   } catch (error) {
     console.log('Content script may already be injected:', error.message);
   }
-  
+
   // Wait a bit for content script to initialize
   setTimeout(async () => {
     // Show UNOBTRUSIVE notification for known surveys
@@ -845,7 +845,7 @@ async function handleKnownSurvey(tabId, duplicateDetails) {
       type: 'info',
       duration: 5000  // Make it longer so user can see it
     });
-    
+
     if (response) {
       console.log('Notification sent successfully:', response);
     } else {
@@ -858,7 +858,7 @@ async function handleKnownSurvey(tabId, duplicateDetails) {
       });
     }
   }, 500);
-  
+
   console.log('Known survey handled with notification attempt');
 }
 
@@ -868,11 +868,11 @@ async function performAutofillOnly(tabId, domainData, isTabActive) {
     const result = await chrome.storage.local.get('options');
     const options = result.options || {};
     const iframeSupport = options.iframeSupportEnabled || false;
-    
+
     chrome.storage.local.get('fields', function(data) {
       const allFields = data.fields || [];
       let fieldsToFill = [];
-      
+
       if (domainData.fillAllFields) {
         fieldsToFill = allFields;
       } else if (domainData.specificFields && domainData.specificFields.length > 0) {
@@ -880,12 +880,12 @@ async function performAutofillOnly(tabId, domainData, isTabActive) {
           domainData.specificFields.includes(field.id)
         );
       }
-      
+
       if (fieldsToFill.length === 0) {
         console.log('No fields to fill for autofill-only domain');
         return;
       }
-      
+
       chrome.scripting.executeScript({
         target: {tabId: tabId},
         files: ['content.js']
@@ -907,7 +907,7 @@ async function performAutofillOnly(tabId, domainData, isTabActive) {
         console.error("Error injecting content script for autofill-only:", error);
       });
     });
-    
+
   } catch (error) {
     console.error("Error in performAutofillOnly:", error);
   }
@@ -925,13 +925,13 @@ function performFillOperationOnly(tabId, fieldsToFill, domainData, iframeSupport
         console.log('Error sending fillFields message for autofill-only:', chrome.runtime.lastError.message);
         return;
       }
-      
+
       if (response && response.status === 'success') {
         const results = response.result || [];
         const successCount = results.filter(r => r.status === 'success').length;
-        
+
         logAutoFill(domainData.domain, results);
-        
+
         chrome.storage.local.get('options', function(data) {
           const options = data.options || {};
           if (options.notifyOnAutoFill !== false && successCount > 0) {
@@ -939,7 +939,7 @@ function performFillOperationOnly(tabId, fieldsToFill, domainData, iframeSupport
             if (iframeSupport) {
               message += ' [including iframes]';
             }
-            
+
             chrome.tabs.sendMessage(tabId, {
               action: 'showNotification',
               message: message,
@@ -962,11 +962,11 @@ async function performAutofillAndSurveyTracking(tabId, domainData, surveyInfo, i
     const result = await chrome.storage.local.get('options');
     const options = result.options || {};
     const iframeSupport = options.iframeSupportEnabled || false;
-    
+
     chrome.storage.local.get('fields', function(data) {
       const allFields = data.fields || [];
       let fieldsToFill = [];
-      
+
       if (domainData.fillAllFields) {
         fieldsToFill = allFields;
       } else if (domainData.specificFields && domainData.specificFields.length > 0) {
@@ -974,7 +974,7 @@ async function performAutofillAndSurveyTracking(tabId, domainData, surveyInfo, i
           domainData.specificFields.includes(field.id)
         );
       }
-      
+
       if (fieldsToFill.length === 0) {
         console.log('No fields to fill, showing purple notification without autofill');
         if (surveyInfo) {
@@ -983,7 +983,7 @@ async function performAutofillAndSurveyTracking(tabId, domainData, surveyInfo, i
         }
         return;
       }
-      
+
       chrome.scripting.executeScript({
         target: {tabId: tabId},
         files: ['content.js']
@@ -1008,7 +1008,7 @@ async function performAutofillAndSurveyTracking(tabId, domainData, surveyInfo, i
         }
       });
     });
-    
+
   } catch (error) {
     console.error("Error in performAutofillAndSurveyTracking:", error);
     if (surveyInfo) {
@@ -1029,13 +1029,13 @@ function performFillOperation(tabId, fieldsToFill, surveyInfo, domainData, ifram
         console.log('Error sending fillFields message:', chrome.runtime.lastError.message);
         return;
       }
-      
+
       if (response && response.status === 'success') {
         const results = response.result || [];
         const successCount = results.filter(r => r.status === 'success').length;
-        
+
         logAutoFill(domainData.domain, results);
-        
+
         // If this was a survey, show the purple notification
         if (surveyInfo) {
           console.log('🟣 Survey detected and autofilled:', surveyInfo, 'successCount:', successCount);
@@ -1045,7 +1045,7 @@ function performFillOperation(tabId, fieldsToFill, surveyInfo, domainData, ifram
             surveyData.autofilled = true;
             surveyData.autofilledAt = Date.now();
             surveyData.fieldsFilledCount = successCount;
-            
+
             surveyData.fieldResults = results.map(result => ({
               fieldId: result.id,
               selector: result.selector,
@@ -1053,17 +1053,17 @@ function performFillOperation(tabId, fieldsToFill, surveyInfo, domainData, ifram
               status: result.status,
               message: result.message || ''
             }));
-            
+
             addToSurveyQueue(surveyData);
             console.log('🟣 About to show PURPLE notification for NEW survey with autofill');
-            
+
             chrome.tabs.get(tabId, function(tab) {
               if (chrome.runtime.lastError) {
                 console.log('Tab no longer exists, storing notification anyway');
                 pendingNotifications.set(tabId, surveyData);
                 return;
               }
-              
+
               if (tab.active) {
                 console.log('🟣 Tab is active, showing PURPLE notification immediately');
                 showSurveyAutofilledNotification(tabId, surveyData);
@@ -1076,7 +1076,7 @@ function performFillOperation(tabId, fieldsToFill, surveyInfo, domainData, ifram
             console.log('No surveyData found for tab:', tabId);
           }
         }
-        
+
         // Show regular autofill notification
         chrome.storage.local.get('options', function(data) {
           const options = data.options || {};
@@ -1088,7 +1088,7 @@ function performFillOperation(tabId, fieldsToFill, surveyInfo, domainData, ifram
             if (iframeSupport) {
               message += ' [including iframes]';
             }
-            
+
             chrome.tabs.sendMessage(tabId, {
               action: 'showNotification',
               message: message,
@@ -1104,26 +1104,26 @@ function performFillOperation(tabId, fieldsToFill, surveyInfo, domainData, ifram
     });
   }, 200);
 }
-    
+
 
 // EXTRACTED: Handle duplicate survey detection and notification
 async function handleDuplicateSurvey(tabId, duplicateDetails) {
   debugLog('*** DUPLICATE DETECTED - SHOWING SINGLE INFO MESSAGE ***');
-  
+
   const survey = duplicateDetails;
   let message = '';
-  
+
   if (survey.status === 'completed') {
     const timeSince = Math.floor((Date.now() - survey.completedAt) / (1000 * 60 * 60 * 24));
     const timeText = timeSince === 0 ? 'today' : 
                     timeSince === 1 ? 'yesterday' : 
                     `${timeSince} days ago`;
     message = `Survey completed ${timeText} - continuing from where you left off`;
-    
+
     // Update encounter count
     survey.duplicateEncounters = (survey.duplicateEncounters || 0) + 1;
     survey.lastEncountered = Date.now();
-    
+
     const completedSurveys = await getCompletedSurveys();
     const updatedSurveys = completedSurveys.map(s => s.id === survey.id ? survey : s);
     await chrome.storage.local.set({completedSurveys: updatedSurveys});
@@ -1133,15 +1133,15 @@ async function handleDuplicateSurvey(tabId, duplicateDetails) {
                     timeSince === 1 ? '1 hour ago' : 
                     `${timeSince} hours ago`;
     message = `Survey in progress (started ${timeText}) - continuing from where you left off`;
-    
+
     // Update last active time
     survey.lastActiveAt = Date.now();
-    
+
     const inProgressSurveys = await getInProgressSurveys();
     const updatedSurveys = inProgressSurveys.map(s => s.id === survey.id ? survey : s);
     await chrome.storage.local.set({inProgressSurveys: updatedSurveys});
   }
-  
+
   // Show SINGLE friendly notification for duplicates
   await sendTabMessage(tabId, {
     action: 'showNotification',
@@ -1149,7 +1149,7 @@ async function handleDuplicateSurvey(tabId, duplicateDetails) {
     type: 'info',
     duration: 4000
   });
-  
+
   debugLog('Duplicate handled, no autofill or purple notifications');
 }
 
@@ -1158,23 +1158,23 @@ async function showNewSurveyNotification(tabId, surveyInfo, isTabActive) {
   console.log('\ud83d\udfe3 *** showNewSurveyNotification CALLED ***');
   console.log('\ud83d\udfe3 TabId:', tabId, 'isTabActive:', isTabActive);
   console.log('\ud83d\udfe3 SurveyInfo:', surveyInfo);
-  
+
   debugLog('*** NEW SURVEY - PREPARING PURPLE NOTIFICATION ***');
-  
+
   const surveyData = activeSurveys.get(tabId);
   if (!surveyData) {
     debugLog('No survey data found for tab:', tabId);
     return;
   }
-  
+
   addToSurveyQueue(surveyData);
-  
+
   const notificationData = {
     ...surveyData,
     fieldsFilledCount: 0, // No autofill happened
     autofilled: false
   };
-  
+
   if (isTabActive) {
     // Tab is currently being viewed, show notification immediately
     debugLog('Tab is active, showing notification immediately');
@@ -1194,11 +1194,11 @@ async function performAutofillOnly(tabId, domainData, isTabActive) {
     const result = await chrome.storage.local.get('options');
     const options = result.options || {};
     const iframeSupport = options.iframeSupportEnabled || false;
-    
+
     chrome.storage.local.get('fields', function(data) {
       const allFields = data.fields || [];
       let fieldsToFill = [];
-      
+
       if (domainData.fillAllFields) {
         fieldsToFill = allFields;
       } else if (domainData.specificFields && domainData.specificFields.length > 0) {
@@ -1206,12 +1206,12 @@ async function performAutofillOnly(tabId, domainData, isTabActive) {
           domainData.specificFields.includes(field.id)
         );
       }
-      
+
       if (fieldsToFill.length === 0) {
         console.log('No fields to fill for autofill-only domain');
         return;
       }
-      
+
       // Inject content script and fill fields
       chrome.scripting.executeScript({
         target: {tabId: tabId},
@@ -1235,7 +1235,7 @@ async function performAutofillOnly(tabId, domainData, isTabActive) {
         console.error("Error injecting content script for autofill-only:", error);
       });
     });
-    
+
   } catch (error) {
     console.error("Error in performAutofillOnly:", error);
   }
@@ -1253,14 +1253,14 @@ function performFillOperationOnly(tabId, fieldsToFill, domainData, iframeSupport
         console.log('Error sending fillFields message for autofill-only:', chrome.runtime.lastError.message);
         return;
       }
-      
+
       if (response && response.status === 'success') {
         const results = response.result || [];
         const successCount = results.filter(r => r.status === 'success').length;
-        
+
         // Log the fill attempt
         logAutoFill(domainData.domain, results);
-        
+
         // Show regular autofill notification
         chrome.storage.local.get('options', function(data) {
           const options = data.options || {};
@@ -1269,7 +1269,7 @@ function performFillOperationOnly(tabId, fieldsToFill, domainData, iframeSupport
             if (iframeSupport) {
               message += ' [including iframes]';
             }
-            
+
             chrome.tabs.sendMessage(tabId, {
               action: 'showNotification',
               message: message,
@@ -1293,11 +1293,11 @@ async function performAutofillAndSurveyTracking(tabId, domainData, surveyInfo, i
     const result = await chrome.storage.local.get('options');
     const options = result.options || {};
     const iframeSupport = options.iframeSupportEnabled || false;
-    
+
     chrome.storage.local.get('fields', function(data) {
       const allFields = data.fields || [];
       let fieldsToFill = [];
-      
+
       if (domainData.fillAllFields) {
         fieldsToFill = allFields;
       } else if (domainData.specificFields && domainData.specificFields.length > 0) {
@@ -1305,7 +1305,7 @@ async function performAutofillAndSurveyTracking(tabId, domainData, surveyInfo, i
           domainData.specificFields.includes(field.id)
         );
       }
-      
+
       if (fieldsToFill.length === 0) {
         console.log('No fields to fill, checking survey tracking only');
         if (surveyInfo) {
@@ -1314,7 +1314,7 @@ async function performAutofillAndSurveyTracking(tabId, domainData, surveyInfo, i
         }
         return;
       }
-      
+
       // Inject content script and fill fields
       chrome.scripting.executeScript({
         target: {tabId: tabId},
@@ -1342,7 +1342,7 @@ async function performAutofillAndSurveyTracking(tabId, domainData, surveyInfo, i
         }
       });
     });
-    
+
   } catch (error) {
     console.error("Error in performAutofillAndSurveyTracking:", error);
     // Fallback: if everything fails, still try survey tracking
@@ -1461,68 +1461,68 @@ function detectSurveyPage(url, title, isAutofillDomain = false) {
   console.log('🌐 URL:', url);
   console.log('📝 Title:', title);
   console.log('🛡️ isAutofillDomain:', isAutofillDomain);
-  
+
   console.log('=== detectSurveyPage START ===');
   console.log('URL:', url);
   console.log('Title:', title);
   console.log('isAutofillDomain:', isAutofillDomain);
-  
+
   // Check if this is a login page first - never treat login pages as surveys
   if (isLoginPage(url, title)) {
     console.log('Login page detected, skipping survey tracking:', url);
     return null;
   }
-  
+
   const domain = new URL(url).hostname.toLowerCase();
   console.log('Checking domain:', domain);
-  
+
   // UPDATED: More specific survey URL patterns - independent of autofill domains
   const specificSurveyPatterns = [
     // SurveyMonkey - only detect actual survey pages, not just any SurveyMonkey page
     {pattern: /surveymonkey\.com\/r\//i, platform: 'SurveyMonkey', confidence: 'high'},
-    
+
     // Typeform - only detect form pages
     {pattern: /[a-zA-Z0-9-]+\.typeform\.com\/to\//i, platform: 'Typeform', confidence: 'high'},
-    
+
     // Qualtrics - only detect survey pages with SID parameter or survey path
     {pattern: /[a-zA-Z0-9-]+\.qualtrics\.com.*[\?&]SID=/i, platform: 'Qualtrics', confidence: 'high'},
     {pattern: /[a-zA-Z0-9-]+\.qualtrics\.com\/jfe\/form\//i, platform: 'Qualtrics', confidence: 'high'},
-    
+
     // Google Forms - only detect form pages, not Drive or other Google services
     {pattern: /docs\.google\.com\/forms\/d\//i, platform: 'Google Forms', confidence: 'high'},
-    
+
     // Microsoft Forms - specific form URLs only
     {pattern: /forms\.office\.com\/.+\/forms\//i, platform: 'Microsoft Forms', confidence: 'high'},
     {pattern: /forms\.microsoft\.com\/.+\/forms\//i, platform: 'Microsoft Forms', confidence: 'high'},
-    
+
     // Other form platforms - specific form URLs
     {pattern: /[a-zA-Z0-9-]+\.wufoo\.com\/forms\//i, platform: 'Wufoo', confidence: 'high'},
     {pattern: /form\.jotform\.com\/.+/i, platform: 'JotForm', confidence: 'high'},
     {pattern: /[a-zA-Z0-9-]+\.formstack\.com\/forms\//i, platform: 'Formstack', confidence: 'high'},
-    
+
     // Research platforms - specific project/study URLs
     {pattern: /facilitymanagerplus\.com.*[\?&]k=/i, platform: 'FacilityManager+', confidence: 'high'},
     {pattern: /userinterviews\.com\/projects\//i, platform: 'UserInterviews', confidence: 'high'},
     {pattern: /userinterviews\.com\/participants\//i, platform: 'UserInterviews', confidence: 'high'},
     {pattern: /app\.respondent\.io\/projects\//i, platform: 'Respondent.io', confidence: 'high'},
-    
+
     // Additional patterns for common survey/form indicators
     {pattern: /\/survey\/.+/i, platform: 'Survey Platform', confidence: 'medium'},
     {pattern: /\/form\/.+/i, platform: 'Form Platform', confidence: 'medium'},
     {pattern: /\/questionnaire\/.+/i, platform: 'Questionnaire', confidence: 'medium'},
-    
+
     // URL patterns with survey-like parameters
     {pattern: /[\?&](?:survey|form|questionnaire|feedback)=/i, platform: 'Survey Form', confidence: 'medium'}
   ];
-  
+
   // Check for specific survey URL patterns first - ALWAYS detect these regardless of autofill
   const matchedPattern = specificSurveyPatterns.find(p => p.pattern.test(url));
-  
+
   if (matchedPattern) {
     console.log('🎆 *** SURVEY PLATFORM DETECTED BY SPECIFIC PATTERN ***:', matchedPattern.platform);
     const surveyId = extractSurveyId(url, title);
     const urlSegments = parseUrlSegments(url);
-    
+
     if (surveyId && surveyId !== 'unknown_survey' && surveyId.length >= 4) {
       console.log('✅ Valid survey ID extracted:', surveyId);
       return {
@@ -1539,16 +1539,16 @@ function detectSurveyPage(url, title, isAutofillDomain = false) {
       console.log('⚠️ Pattern matched but could not extract valid survey ID');
     }
   }
-  
+
   // Fallback: If domain is in autofill list and looks survey-like, offer tracking
   if (isAutofillDomain) {
     console.log('Domain is in autofill list - checking if it should be treated as survey');
     const surveyId = extractSurveyId(url, title);
     const urlSegments = parseUrlSegments(url);
-    
+
     // Only offer survey tracking if we can extract a reasonable survey ID AND URL has survey indicators
     const hasSurveyIndicators = /(?:survey|form|questionnaire|feedback|study|research|interview|participant|application)/i.test(url);
-    
+
     if (surveyId && surveyId !== 'unknown_survey' && surveyId.length >= 6 && hasSurveyIndicators) {
       console.log('✅ Autofill domain with survey indicators and valid ID detected');
       return {
@@ -1567,7 +1567,7 @@ function detectSurveyPage(url, title, isAutofillDomain = false) {
   } else {
     console.log('🚫 Domain not in autofill list and no specific survey pattern matched');
   }
-  
+
   return null;
 }
 
@@ -1587,10 +1587,10 @@ function isLoginPage(url, title) {
     /login\.html/i,    // login.html files
     /signin\.html/i,   // signin.html files
   ];
-  
+
   // Only check URL, not title (title can be misleading)
   const urlText = url.toLowerCase();
-  
+
   return loginIndicators.some(pattern => pattern.test(urlText));
 }
 
@@ -1600,11 +1600,11 @@ function extractSurveyId(url, title) {
     const urlObj = new URL(url);
     const pathParts = urlObj.pathname.split('/').filter(part => part.length > 0);
     const queryParams = new URLSearchParams(urlObj.search);
-    
+
     console.log('extractSurveyId called with URL:', url);
     console.log('Path parts:', pathParts);
     console.log('Query params:', Array.from(queryParams.entries()));
-    
+
     // Platform-specific ID extraction with priority order
     if (url.includes('facilitymanagerplus.com')) {
       // High priority: k parameter (this is the main survey ID)
@@ -1674,7 +1674,7 @@ function extractSurveyId(url, title) {
         return id;
       }
     }
-    
+
     // Generic patterns - look for common survey ID parameters first
     const commonIdParams = ['respCampaign', 'k', 'id', 'survey', 'form', 'sid', 'fid', 'uuid', 'token', 'participant', 'refer'];
     for (const param of commonIdParams) {
@@ -1684,7 +1684,7 @@ function extractSurveyId(url, title) {
         return value;
       }
     }
-    
+
     // Look for long alphanumeric IDs in path (relaxed requirements)
     for (const part of pathParts) {
       // Accept IDs that are 6+ characters long and alphanumeric (including common patterns like wD3nWjer1w)
@@ -1695,7 +1695,7 @@ function extractSurveyId(url, title) {
         return part;
       }
     }
-    
+
     // Fallback: create hash from URL path + main parameters
     const baseUrl = urlObj.origin + urlObj.pathname;
     const mainParams = ['k', 'id', 'survey'].map(p => queryParams.get(p)).filter(v => v).join('');
@@ -1703,7 +1703,7 @@ function extractSurveyId(url, title) {
     const fallbackId = btoa(fallbackInput).substring(0, 16).replace(/[^a-zA-Z0-9]/g, '');
     console.log('Fallback ID created from:', fallbackInput, '-> ID:', fallbackId);
     return fallbackId;
-    
+
   } catch (error) {
     console.log('Error extracting survey ID:', error);
     return 'unknown_survey_' + Date.now();
@@ -1715,7 +1715,7 @@ function parseUrlSegments(url) {
   try {
     const urlObj = new URL(url);
     const segments = [];
-    
+
     // Add domain (not selectable)
     segments.push({
       type: 'domain',
@@ -1723,7 +1723,7 @@ function parseUrlSegments(url) {
       display: urlObj.hostname,
       selectable: false
     });
-    
+
     // Add path segments (selectable)
     const pathParts = urlObj.pathname.split('/').filter(part => part.length > 0);
     pathParts.forEach(part => {
@@ -1734,7 +1734,7 @@ function parseUrlSegments(url) {
         selectable: true
       });
     });
-    
+
     // Add query parameters (selectable) - FIXED: Show parameter name for context but value is selectable
     if (urlObj.search) {
       const queryParams = new URLSearchParams(urlObj.search);
@@ -1751,7 +1751,7 @@ function parseUrlSegments(url) {
         }
       });
     }
-    
+
     return segments;
   } catch (error) {
     return [];
@@ -1764,10 +1764,10 @@ function parseUrlSegments(url) {
 function addToSurveyQueue(surveyData) {
   // Remove any existing entry for this tab
   surveyQueue = surveyQueue.filter(s => s.tabId !== surveyData.tabId);
-  
+
   // Add new entry
   surveyQueue.unshift(surveyData);
-  
+
   // Keep queue size manageable
   if (surveyQueue.length > MAX_QUEUE_SIZE) {
     surveyQueue = surveyQueue.slice(0, MAX_QUEUE_SIZE);
@@ -1777,14 +1777,14 @@ function addToSurveyQueue(surveyData) {
 // Show enhanced notification after survey autofill
 function showSurveyAutofilledNotification(tabId, surveyData) {
   console.log('Attempting to show survey notification for tab:', tabId, surveyData);
-  
+
   // First verify the tab still exists
   chrome.tabs.get(tabId, function(tab) {
     if (chrome.runtime.lastError) {
       console.log('Tab no longer exists for survey notification:', tabId);
       return;
     }
-    
+
     // Try to send the message directly first
     chrome.tabs.sendMessage(tabId, {
       action: 'showSurveyAutofilledNotification',
@@ -1792,14 +1792,14 @@ function showSurveyAutofilledNotification(tabId, surveyData) {
     }, function(response) {
       if (chrome.runtime.lastError) {
         console.log('Content script not ready, injecting first:', chrome.runtime.lastError.message);
-        
+
         // Content script not loaded, inject it first
         chrome.scripting.executeScript({
           target: {tabId: tabId},
           files: ['content.js']
         }).then(() => {
           console.log('Content script injected, now sending notification');
-          
+
           // Wait a bit longer for content script to initialize
           setTimeout(() => {
             chrome.tabs.sendMessage(tabId, {
@@ -1870,7 +1870,7 @@ function logAutoFill(domain, results) {
     const logs = data.autoFillLogs || [];
     const fields = data.fields || [];
     const learnedPatterns = data.learnedPatterns || {};
-    
+
     // Add new log entry with performance metrics
     logs.unshift({
       timestamp: Date.now(),
@@ -1881,16 +1881,16 @@ function logAutoFill(domain, results) {
         successRate: results.filter(r => r.status === 'success').length / results.length
       }
     });
-    
+
     // Keep only the last 100 logs
     if (logs.length > 100) {
       logs.splice(100);
     }
-    
+
     // Update field usage counters and learn patterns
     let fieldsUpdated = false;
     let patternsUpdated = false;
-    
+
     results.forEach(result => {
       if (result.id) {
         const field = fields.find(f => f.id === result.id);
@@ -1898,15 +1898,15 @@ function logAutoFill(domain, results) {
           // Update usage counters
           field.usageCount = (field.usageCount || 0) + 1;
           field.lastUsed = Date.now();
-          
+
           // Update performance metrics
           if (!field.performance) {
             field.performance = { successCount: 0, failureCount: 0, averageTime: 0 };
           }
-          
+
           if (result.status === 'success') {
             field.performance.successCount++;
-            
+
             // Learn successful patterns for regex types
             if (field.selectorType.startsWith('regex-')) {
               const patternKey = `${field.selectorType}:${field.selector}`;
@@ -1921,27 +1921,27 @@ function logAutoFill(domain, results) {
                   confidence: 0
                 };
               }
-              
+
               const patternData = learnedPatterns[patternKey];
               patternData.successCount++;
-              
+
               if (!patternData.domains.includes(domain)) {
                 patternData.domains.push(domain);
               }
-              
+
               patternData.contexts.push({
                 label: field.label || '',
                 elementType: result.elementType || '',
                 timestamp: Date.now(),
                 domain: domain
               });
-              
+
               patternData.confidence = patternData.successCount / (patternData.successCount + patternData.failureCount);
               patternsUpdated = true;
             }
           } else {
             field.performance.failureCount++;
-            
+
             // Learn from failures too
             if (field.selectorType.startsWith('regex-')) {
               const patternKey = `${field.selectorType}:${field.selector}`;
@@ -1954,22 +1954,22 @@ function logAutoFill(domain, results) {
               }
             }
           }
-          
+
           // Update average performance time
           const totalAttempts = field.performance.successCount + field.performance.failureCount;
           field.performance.averageTime = 
             ((field.performance.averageTime * (totalAttempts - 1)) + (result.performance || 0)) / totalAttempts;
-          
+
           fieldsUpdated = true;
         }
       }
     });
-    
+
     // Save all updates
     const updates = { autoFillLogs: logs };
     if (fieldsUpdated) updates.fields = fields;
     if (patternsUpdated) updates.learnedPatterns = learnedPatterns;
-    
+
     chrome.storage.local.set(updates);
   });
 }
@@ -1978,16 +1978,16 @@ function logAutoFill(domain, results) {
 function markSurveyCompleted(surveyData) {
   console.log('=== markSurveyCompleted START ===');
   console.log('Survey data to mark completed:', surveyData);
-  
+
   if (!surveyData || !surveyData.id) {
     console.error('Invalid survey data provided to markSurveyCompleted');
     return;
   }
-  
+
   chrome.storage.local.get('completedSurveys', function(data) {
     const completedSurveys = data.completedSurveys || [];
     console.log('Current completed surveys count:', completedSurveys.length);
-    
+
     const completedSurvey = {
       id: surveyData.id,
       title: surveyData.title,
@@ -2001,9 +2001,9 @@ function markSurveyCompleted(surveyData) {
       fieldResults: surveyData.fieldResults || [], // RESTORED: Include field-level debugging info
       duplicateEncounters: 0
     };
-    
+
     console.log('Creating completed survey record:', completedSurvey);
-    
+
     // Check if already exists
     const existingIndex = completedSurveys.findIndex(survey => survey.id === surveyData.id);
     if (existingIndex >= 0) {
@@ -2013,15 +2013,15 @@ function markSurveyCompleted(surveyData) {
       console.log('Adding new survey to completed list');
       completedSurveys.unshift(completedSurvey);
     }
-    
+
     // Keep only the last 1000 surveys
     if (completedSurveys.length > 1000) {
       completedSurveys.splice(1000);
     }
-    
+
     console.log('Saving completed surveys. New count:', completedSurveys.length);
     console.log('All completed survey IDs:', completedSurveys.map(s => s.id));
-    
+
     chrome.storage.local.set({completedSurveys: completedSurveys}, function() {
       if (chrome.runtime.lastError) {
         console.error('Error saving completed surveys:', chrome.runtime.lastError);
@@ -2037,7 +2037,7 @@ function markSurveyCompleted(surveyData) {
 function markSurveyInProgress(surveyData) {
   chrome.storage.local.get('inProgressSurveys', function(data) {
     const inProgressSurveys = data.inProgressSurveys || [];
-    
+
     const inProgressSurvey = {
       id: surveyData.id,
       title: surveyData.title,
@@ -2052,7 +2052,7 @@ function markSurveyInProgress(surveyData) {
       fieldResults: surveyData.fieldResults || [], // RESTORED: Include field-level debugging info
       tabId: surveyData.tabId
     };
-    
+
     // Check if already exists
     const existingIndex = inProgressSurveys.findIndex(survey => survey.id === surveyData.id);
     if (existingIndex >= 0) {
@@ -2061,12 +2061,12 @@ function markSurveyInProgress(surveyData) {
     } else {
       inProgressSurveys.unshift(inProgressSurvey);
     }
-    
+
     // Keep only the last 50 surveys
     if (inProgressSurveys.length > 50) {
       inProgressSurveys.splice(50);
     }
-    
+
     chrome.storage.local.set({inProgressSurveys: inProgressSurveys});
   });
 }
@@ -2075,24 +2075,24 @@ function markSurveyInProgress(surveyData) {
 function moveFromInProgressToCompleted(surveyId) {
   console.log('=== moveFromInProgressToCompleted START ===');
   console.log('Survey ID to move:', surveyId);
-  
+
   chrome.storage.local.get(['inProgressSurveys', 'completedSurveys'], function(data) {
     const inProgressSurveys = data.inProgressSurveys || [];
     const completedSurveys = data.completedSurveys || [];
-    
+
     console.log('Current in-progress surveys count:', inProgressSurveys.length);
     console.log('Current completed surveys count:', completedSurveys.length);
     console.log('Looking for survey ID:', surveyId, 'in in-progress list');
-    
+
     const surveyIndex = inProgressSurveys.findIndex(survey => {
       console.log('Comparing:', survey.id, '===', surveyId, '?', survey.id === surveyId);
       return survey.id === surveyId;
     });
-    
+
     if (surveyIndex >= 0) {
       const survey = inProgressSurveys[surveyIndex];
       console.log('Found survey to move:', survey);
-      
+
       // Create completed survey record
       const completedSurvey = {
         ...survey,
@@ -2100,25 +2100,25 @@ function moveFromInProgressToCompleted(surveyId) {
         timeSpent: Date.now() - survey.startedAt,
         duplicateEncounters: 0
       };
-      
+
       // Clean up in-progress specific fields
       delete completedSurvey.startedAt;
       delete completedSurvey.lastActiveAt;
       delete completedSurvey.tabId;
-      
+
       console.log('Created completed survey record:', completedSurvey);
-      
+
       // Add to completed and remove from in-progress
       completedSurveys.unshift(completedSurvey);
       inProgressSurveys.splice(surveyIndex, 1);
-      
+
       console.log('Moved survey. New counts - In-progress:', inProgressSurveys.length, 'Completed:', completedSurveys.length);
-      
+
       // Keep only last 1000 completed surveys
       if (completedSurveys.length > 1000) {
         completedSurveys.splice(1000);
       }
-      
+
       chrome.storage.local.set({
         inProgressSurveys: inProgressSurveys,
         completedSurveys: completedSurveys
@@ -2151,9 +2151,9 @@ function removeFromInProgress(surveyId) {
 chrome.commands.onCommand.addListener(function(command) {
   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
     if (!tabs[0]) return;
-    
+
     const tabId = tabs[0].id;
-    
+
     switch (command) {
       case 'fill-all-fields':
         handleFillAllFieldsHotkey(tabId);
@@ -2173,12 +2173,12 @@ function handleFillAllFieldsHotkey(tabId) {
       console.log('Tab no longer exists for hotkey:', tabId);
       return;
     }
-    
+
     chrome.storage.local.get(['fields', 'options'], function(data) {
       const fields = data.fields || [];
       const options = data.options || {};
       const includeIframes = options.iframeSupportEnabled || false;
-      
+
       if (fields.length === 0) {
         chrome.tabs.sendMessage(tabId, {
           action: 'showNotification',
@@ -2189,7 +2189,7 @@ function handleFillAllFieldsHotkey(tabId) {
         });
         return;
       }
-      
+
       chrome.scripting.executeScript({
         target: {tabId: tabId},
         files: ['content.js']
@@ -2203,7 +2203,7 @@ function handleFillAllFieldsHotkey(tabId) {
             // Ignore iframe injection errors for hotkeys
           });
         }
-        
+
         setTimeout(() => {
           chrome.tabs.sendMessage(tabId, {
             action: 'fillFields',
@@ -2214,16 +2214,16 @@ function handleFillAllFieldsHotkey(tabId) {
               console.log('Error in hotkey fillFields:', chrome.runtime.lastError.message);
               return;
             }
-            
+
             if (response && response.status === 'success') {
               const results = response.result || [];
               const successCount = results.filter(r => r.status === 'success').length;
-              
+
               let message = `Filled ${successCount} out of ${fields.length} fields`;
               if (includeIframes) {
                 message += ' [including iframes]';
               }
-              
+
               chrome.tabs.sendMessage(tabId, {
                 action: 'showNotification',
                 message: message,
@@ -2257,7 +2257,7 @@ function handleSelectFieldHotkey(tabId) {
       console.log('Tab no longer exists for select field hotkey:', tabId);
       return;
     }
-    
+
     chrome.runtime.sendMessage({
       action: 'setFieldSelection',
       data: {}
@@ -2274,7 +2274,7 @@ function handleSelectFieldHotkey(tabId) {
               console.log('Error starting field selector:', chrome.runtime.lastError.message);
               return;
             }
-            
+
             chrome.tabs.sendMessage(tabId, {
               action: 'showNotification',
               message: 'Click on a form field to select it',
@@ -2294,7 +2294,7 @@ function handleSelectFieldHotkey(tabId) {
 // Helper function to create a generic survey entry when no specific survey is detected
 function createGenericSurveyEntry(tab, sendResponse) {
   const genericId = 'manual_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-  
+
   const surveyData = {
     id: genericId,
     url: tab.url,
@@ -2306,7 +2306,7 @@ function createGenericSurveyEntry(tab, sendResponse) {
     completedAt: Date.now(),
     detectionSource: 'manual'
   };
-  
+
   console.log('Creating generic survey entry:', surveyData);
   markSurveyCompleted(surveyData);
   sendResponse({status: 'success', message: 'Page marked as completed survey'});
@@ -2318,7 +2318,7 @@ chrome.tabs.onRemoved.addListener(function(tabId) {
     activeSurveys.delete(tabId);
   }
   surveyQueue = surveyQueue.filter(s => s.tabId !== tabId);
-  
+
   // Clean up pending notifications for closed tabs
   if (pendingNotifications.has(tabId)) {
     console.log('Cleaning up pending notification for closed tab:', tabId);
@@ -2331,14 +2331,14 @@ async function exportDataToWorkingDir(data) {
   try {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fileName = `RoboFormSettings/autofill-settings-${timestamp}.json`;
-    
+
     // Create the JSON content
     const jsonContent = JSON.stringify(data, null, 2);
-    
+
     // Use chrome.downloads API to save to Downloads/RoboFormSettings/ folder
     const blob = new Blob([jsonContent], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    
+
     return new Promise((resolve, reject) => {
       chrome.downloads.download({
         url: url,
@@ -2347,7 +2347,7 @@ async function exportDataToWorkingDir(data) {
         conflictAction: 'overwrite'
       }, (downloadId) => {
         URL.revokeObjectURL(url);
-        
+
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
         } else {
@@ -2380,19 +2380,19 @@ async function importDataFromWorkingDir() {
           reject(new Error(chrome.runtime.lastError.message));
           return;
         }
-        
+
         if (!items || items.length === 0) {
           reject(new Error('No exported settings found in Downloads/RoboFormSettings/'));
           return;
         }
-        
+
         // Get the most recent successful download
         const latestFile = items[0];
         if (!latestFile.exists || latestFile.state !== 'complete') {
           reject(new Error('Latest settings file is not accessible'));
           return;
         }
-        
+
         // Return file info for manual processing
         resolve({
           status: 'found',
@@ -2415,16 +2415,16 @@ chrome.runtime.onInstalled.addListener(function() {
   console.log('🚀 EXTENSION INSTALLED/UPDATED - AutoFill Extension Starting');
   console.log('🚀 Extension ID:', chrome.runtime.id);
   console.log('🚀 Manifest version:', chrome.runtime.getManifest().version);
-  
+
   chrome.storage.local.get(['fields', 'domains', 'options'], function(data) {
     if (!data.fields) {
       chrome.storage.local.set({fields: []});
     }
-    
+
     if (!data.domains) {
       chrome.storage.local.set({domains: []});
     }
-    
+
     if (!data.options) {
       chrome.storage.local.set({
         options: {
@@ -2439,9 +2439,9 @@ chrome.runtime.onInstalled.addListener(function() {
       data.options.debugMode = true;
       chrome.storage.local.set({options: data.options});
     }
-    
+
     console.log('🚀 Extension initialized with data:', data);
-    
+
     // Clean up any invalid surveys on startup
     setTimeout(() => {
       cleanupInvalidSurveys();
@@ -2455,7 +2455,7 @@ async function checkForExistingSurveyKeyInUrl(url) {
     chrome.storage.local.get(['completedSurveys', 'inProgressSurveys'], function(data) {
       const completedSurveys = data.completedSurveys || [];
       const inProgressSurveys = data.inProgressSurveys || [];
-      
+
       // Parse URL to get path and query parameters
       let urlObj;
       try {
@@ -2465,21 +2465,21 @@ async function checkForExistingSurveyKeyInUrl(url) {
         resolve(null);
         return;
       }
-      
+
       const pathSegments = urlObj.pathname.split('/').filter(s => s.length > 0);
       const queryParams = Array.from(urlObj.searchParams.values());
-      
+
       // Check completed surveys
       for (const survey of completedSurveys) {
         if (!survey.id || survey.id.length < 3) continue; // Skip very short IDs
-        
+
         // Check if survey ID matches a path segment exactly
         if (pathSegments.includes(survey.id)) {
           console.log(`Found completed survey key "${survey.id}" in URL path`);
           resolve({...survey, status: 'completed', surveyId: survey.id});
           return;
         }
-        
+
         // Check if survey ID matches a query parameter value exactly
         if (queryParams.includes(survey.id)) {
           console.log(`Found completed survey key "${survey.id}" in URL query`);
@@ -2487,18 +2487,18 @@ async function checkForExistingSurveyKeyInUrl(url) {
           return;
         }
       }
-      
+
       // Check in-progress surveys
       for (const survey of inProgressSurveys) {
         if (!survey.id || survey.id.length < 3) continue; // Skip very short IDs
-        
+
         // Check if survey ID matches a path segment exactly
         if (pathSegments.includes(survey.id)) {
           console.log(`Found in-progress survey key "${survey.id}" in URL path`);
           resolve({...survey, status: 'in-progress', surveyId: survey.id});
           return;
         }
-        
+
         // Check if survey ID matches a query parameter value exactly
         if (queryParams.includes(survey.id)) {
           console.log(`Found in-progress survey key "${survey.id}" in URL query`);
@@ -2506,7 +2506,7 @@ async function checkForExistingSurveyKeyInUrl(url) {
           return;
         }
       }
-      
+
       resolve(null);
     });
   });
@@ -2518,21 +2518,21 @@ function checkForDuplicateSurvey(surveyId) {
     chrome.storage.local.get(['completedSurveys', 'inProgressSurveys'], function(data) {
       const completedSurveys = data.completedSurveys || [];
       const inProgressSurveys = data.inProgressSurveys || [];
-      
+
       // Check completed surveys
       const completedSurvey = completedSurveys.find(s => s.id === surveyId);
       if (completedSurvey) {
         resolve({...completedSurvey, status: 'completed'});
         return;
       }
-      
+
       // Check in-progress surveys
       const inProgressSurvey = inProgressSurveys.find(s => s.id === surveyId);
       if (inProgressSurvey) {
         resolve({...inProgressSurvey, status: 'in-progress'});
         return;
       }
-      
+
       resolve(null);
     });
   });
@@ -2561,10 +2561,10 @@ function cleanupInvalidSurveys() {
   chrome.storage.local.get(['completedSurveys', 'inProgressSurveys'], function(data) {
     const completedSurveys = data.completedSurveys || [];
     const inProgressSurveys = data.inProgressSurveys || [];
-    
+
     // Filter out surveys with invalid IDs (too short or generic)
     const genericIds = ['e', 'r', 'd', 'to', 'survey', 'form', 'Survey', 'Form'];
-    
+
     const validCompletedSurveys = completedSurveys.filter(survey => {
       if (!survey.id || survey.id.length < 4) {
         console.log('Removing invalid completed survey with ID:', survey.id);
@@ -2576,7 +2576,7 @@ function cleanupInvalidSurveys() {
       }
       return true;
     });
-    
+
     const validInProgressSurveys = inProgressSurveys.filter(survey => {
       if (!survey.id || survey.id.length < 4) {
         console.log('Removing invalid in-progress survey with ID:', survey.id);
@@ -2588,7 +2588,7 @@ function cleanupInvalidSurveys() {
       }
       return true;
     });
-    
+
     // Save cleaned up data
     chrome.storage.local.set({
       completedSurveys: validCompletedSurveys,

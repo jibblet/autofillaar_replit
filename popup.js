@@ -1,3 +1,390 @@
+// popup.js - Complete Chrome extension popup interface
+
+document.addEventListener('DOMContentLoaded', function() {
+  loadStatus();
+  setupEventListeners();
+});
+
+// Load current status
+function loadStatus() {
+  chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    if (tabs[0]) {
+      updateCurrentStatus(tabs[0]);
+    }
+  });
+
+  // Load field count
+  chrome.storage.local.get('fields', function(data) {
+    const fields = data.fields || [];
+    const fieldCountElement = document.getElementById('field-count');
+    if (fieldCountElement) {
+      fieldCountElement.textContent = fields.length;
+    }
+  });
+
+  // Load domain count
+  chrome.storage.local.get('domains', function(data) {
+    const domains = data.domains || [];
+    const domainCountElement = document.getElementById('domain-count');
+    if (domainCountElement) {
+      domainCountElement.textContent = domains.length;
+    }
+  });
+
+  // Load survey stats
+  loadSurveyStats();
+}
+
+// Update current page status
+function updateCurrentStatus(tab) {
+  if (!tab || !tab.url) return;
+
+  const statusElement = document.getElementById('current-status');
+  if (!statusElement) return;
+
+  try {
+    const url = new URL(tab.url);
+    const domain = url.hostname;
+
+    chrome.storage.local.get('domains', function(data) {
+      const domains = data.domains || [];
+      const matchingDomain = domains.find(d => d.domain === domain && d.enabled);
+
+      if (matchingDomain) {
+        statusElement.innerHTML = `
+          <div class="status-item">
+            <span class="status-label">Current domain:</span>
+            <span class="status-value enabled">${domain} (Enabled)</span>
+          </div>
+        `;
+      } else {
+        statusElement.innerHTML = `
+          <div class="status-item">
+            <span class="status-label">Current domain:</span>
+            <span class="status-value disabled">${domain} (Not configured)</span>
+          </div>
+        `;
+      }
+    });
+  } catch (error) {
+    statusElement.innerHTML = `
+      <div class="status-item">
+        <span class="status-label">Current page:</span>
+        <span class="status-value">Invalid URL</span>
+      </div>
+    `;
+  }
+}
+
+// Load survey statistics
+function loadSurveyStats() {
+  chrome.runtime.sendMessage({action: 'getSurveyStats'}, function(response) {
+    if (response && response.status === 'success') {
+      const stats = response.stats;
+
+      const completedElement = document.getElementById('surveys-completed');
+      const duplicatesElement = document.getElementById('duplicates-avoided');
+
+      if (completedElement) {
+        completedElement.textContent = stats.totalCompleted || 0;
+      }
+
+      if (duplicatesElement) {
+        duplicatesElement.textContent = stats.duplicatesAvoided || 0;
+      }
+    }
+  });
+}
+
+// Setup event listeners
+function setupEventListeners() {
+  // Fill all fields button
+  const fillAllBtn = document.getElementById('fill-all-fields');
+  if (fillAllBtn) {
+    fillAllBtn.addEventListener('click', fillAllFields);
+  }
+
+  // Select field button
+  const selectFieldBtn = document.getElementById('select-field');
+  if (selectFieldBtn) {
+    selectFieldBtn.addEventListener('click', selectField);
+  }
+
+  // Add current site button
+  const addSiteBtn = document.getElementById('add-current-site');
+  if (addSiteBtn) {
+    addSiteBtn.addEventListener('click', addCurrentSiteToAutofill);
+  }
+
+  // Detect fields button
+  const detectFieldsBtn = document.getElementById('detect-fields');
+  if (detectFieldsBtn) {
+    detectFieldsBtn.addEventListener('click', detectFields);
+  }
+
+  // Mark survey completed button
+  const markCompletedBtn = document.getElementById('mark-survey-completed');
+  if (markCompletedBtn) {
+    markCompletedBtn.addEventListener('click', markCurrentSurveyCompleted);
+  }
+
+  // Settings button
+  const settingsBtn = document.getElementById('open-settings');
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', function() {
+      chrome.runtime.openOptionsPage();
+    });
+  }
+
+  // Enhanced survey detection button
+  const enhancedDetectionBtn = document.getElementById('enhanced-survey-detection');
+  if (enhancedDetectionBtn) {
+    enhancedDetectionBtn.addEventListener('click', runEnhancedSurveyDetection);
+  }
+
+  // Field reliability button
+  const reliabilityBtn = document.getElementById('field-reliability');
+  if (reliabilityBtn) {
+    reliabilityBtn.addEventListener('click', showFieldReliability);
+  }
+
+  // Debug button
+  const debugBtn = document.getElementById('debug-extension');
+  if (debugBtn) {
+    debugBtn.addEventListener('click', enableDebugMode);
+  }
+}
+
+// Fill all fields
+function fillAllFields() {
+  chrome.storage.local.get(['fields', 'options'], function(data) {
+    const fields = data.fields || [];
+    const options = data.options || {};
+    const includeIframes = options.iframeSupportEnabled || false;
+
+    if (fields.length === 0) {
+      showNotification('No fields to fill!', 'warning');
+      return;
+    }
+
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      if (tabs[0]) {
+        chrome.scripting.executeScript({
+          target: {tabId: tabs[0].id},
+          files: ['content.js']
+        }).then(() => {
+          if (includeIframes) {
+            chrome.scripting.executeScript({
+              target: {tabId: tabs[0].id, allFrames: true},
+              files: ['content.js']
+            }).catch(error => {
+              console.log('Error injecting into iframes:', error);
+            });
+          }
+
+          chrome.tabs.sendMessage(tabs[0].id, {
+            action: 'fillFields',
+            fields: fields,
+            includeIframes: includeIframes
+          }, function(response) {
+            if (chrome.runtime.lastError) {
+              showNotification('Error: ' + chrome.runtime.lastError.message, 'error');
+              return;
+            }
+
+            if (response && response.status === 'success') {
+              const results = response.result || [];
+              const successCount = results.filter(r => r.status === 'success').length;
+              showNotification(`Filled ${successCount} out of ${fields.length} fields!`, 'success');
+            } else {
+              showNotification('Error filling fields', 'error');
+            }
+          });
+        }).catch(error => {
+          showNotification('Error injecting script: ' + error.message, 'error');
+        });
+      }
+    });
+  });
+}
+
+// Select field on the page
+function selectField() {
+  chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    if (tabs[0]) {
+      chrome.runtime.sendMessage({
+        action: 'setFieldSelection',
+        data: {}
+      }, function() {
+        chrome.scripting.executeScript({
+          target: {tabId: tabs[0].id},
+          files: ['content.js']
+        }).then(() => {
+          chrome.tabs.sendMessage(
+            tabs[0].id,
+            {action: 'startFieldSelector'},
+            function(response) {
+              if (chrome.runtime.lastError) {
+                showNotification('Error: ' + chrome.runtime.lastError.message, 'error');
+              } else {
+                showNotification('Click on a field to select it', 'info');
+              }
+            }
+          );
+        }).catch(error => {
+          showNotification('Error injecting content script: ' + error.message, 'error');
+        });
+      });
+    }
+  });
+}
+
+// Add current site to auto-fill
+function addCurrentSiteToAutofill() {
+  chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    if (tabs[0] && tabs[0].url) {
+      try {
+        const url = new URL(tabs[0].url);
+        const domain = url.hostname;
+
+        chrome.storage.local.get('domains', function(data) {
+          const domains = data.domains || [];
+          const existingDomainIndex = domains.findIndex(d => d.domain === domain);
+
+          if (existingDomainIndex !== -1) {
+            showNotification('Domain already in auto-fill list!', 'warning');
+            return;
+          }
+
+          domains.push({
+            domain: domain,
+            enabled: true,
+            fillAllFields: true,
+            delay: 1000
+          });
+
+          chrome.storage.local.set({domains: domains}, function() {
+            showNotification(`${domain} added to auto-fill list!`, 'success');
+            loadStatus();
+          });
+        });
+      } catch (error) {
+        showNotification('Error adding domain: ' + error.message, 'error');
+      }
+    }
+  });
+}
+
+// Detect fields on current page
+function detectFields() {
+  chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    if (tabs[0]) {
+      chrome.scripting.executeScript({
+        target: {tabId: tabs[0].id},
+        files: ['content.js']
+      }).then(() => {
+        chrome.tabs.sendMessage(tabs[0].id, {action: 'detectFields'}, function(response) {
+          if (chrome.runtime.lastError) {
+            showNotification('Error: ' + chrome.runtime.lastError.message, 'error');
+            return;
+          }
+
+          if (response && response.status === 'success') {
+            const fields = response.fields || [];
+            showNotification(`Detected ${fields.length} populated fields`, 'success');
+          } else {
+            showNotification('Error detecting fields', 'error');
+          }
+        });
+      }).catch(error => {
+        showNotification('Error injecting script: ' + error.message, 'error');
+      });
+    }
+  });
+}
+
+// Mark current survey as completed
+function markCurrentSurveyCompleted() {
+  chrome.runtime.sendMessage({action: 'markCurrentSurveyCompleted'}, function(response) {
+    if (chrome.runtime.lastError) {
+      showNotification('Error: ' + chrome.runtime.lastError.message, 'error');
+      return;
+    }
+
+    if (response && response.status === 'success') {
+      showNotification(response.message, 'success');
+      loadSurveyStats();
+    } else {
+      showNotification(response?.message || 'Error marking survey as completed', 'error');
+    }
+  });
+}
+
+// Run enhanced survey detection
+function runEnhancedSurveyDetection() {
+  chrome.runtime.sendMessage({action: 'testSurveyDetection'}, function(response) {
+    if (response && response.status === 'success') {
+      if (response.surveyInfo) {
+        showNotification(`Survey detected: ${response.surveyInfo.platform}`, 'success');
+      } else {
+        showNotification('No survey detected on current page', 'info');
+      }
+    } else {
+      showNotification('Error running detection', 'error');
+    }
+  });
+}
+
+// Show field reliability
+function showFieldReliability() {
+  chrome.storage.local.get(['fields', 'autoFillLogs'], function(data) {
+    const fields = data.fields || [];
+    const logs = data.autoFillLogs || [];
+
+    let reliableCount = 0;
+    let unreliableCount = 0;
+
+    fields.forEach(field => {
+      const fieldLogs = logs.filter(log => 
+        log.results && log.results.some(r => r.id === field.id && r.status === 'success')
+      );
+
+      if (fieldLogs.length >= 3) {
+        reliableCount++;
+      } else {
+        unreliableCount++;
+      }
+    });
+
+    showNotification(`Reliable fields: ${reliableCount}, Needs testing: ${unreliableCount}`, 'info');
+  });
+}
+
+// Enable debug mode
+function enableDebugMode() {
+  chrome.runtime.sendMessage({action: 'enableDebugMode'}, function(response) {
+    if (response && response.status === 'success') {
+      showNotification('Debug mode enabled! Check console for logs.', 'info');
+    } else {
+      showNotification('Error enabling debug mode', 'error');
+    }
+  });
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+  const notification = document.getElementById('notification');
+  if (notification) {
+    notification.textContent = message;
+    notification.className = `notification ${type}`;
+    notification.style.display = 'block';
+
+    setTimeout(() => {
+      notification.style.display = 'none';
+    }, 3000);
+  }
+}
+
 // Simplified field diagnostics - basic field validation only
 function runFieldDiagnostics() {
   chrome.storage.local.get('fields', function(data) {
@@ -46,7 +433,6 @@ function runEnhancedSurveyDetection() {
         if (response && response.surveyInfo) {
           mainSurveyInfo = response.surveyInfo;
         }
-
 
 // Client-side regex validation
 function validateRegexPattern(pattern) {
@@ -839,9 +1225,6 @@ function openBulkSurveyInterface() {
   });
 }
 
-// Show notification
-function showNotification(message, type = 'success', duration = 3000) {
-
 // Field Validation Framework
 const FieldValidator = {
   // Test field reliability across domains
@@ -1393,6 +1776,7 @@ function showEnhancedSurveyModal() {
           <div id="ongoing-surveys-list" style="max-height: 300px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 5px; margin-bottom: 15px;">
             <div style="text-align: center; padding: 20px; color: #666;">Loading ongoing surveys...</div>
           </div>
+```
         </div>
 
         <div class="modal-footer">

@@ -25,17 +25,17 @@
       '.password-manager-field',
       '.pw-manager-fill'
     ],
-    
+
   // Check if another password manager is active on this page
   hasPasswordManagerConflict: function() {
     const allSelectors = [...this.ROBOFORM_SELECTORS, ...this.PASSWORD_MANAGER_SELECTORS];
     return allSelectors.some(selector => document.querySelector(selector));
   },
-  
+
   // Check if a specific field is managed by another extension
   isFieldManagedByOther: function(element) {
     if (!element) return false;
-    
+
     // Check for password manager attributes
     const allSelectors = [...this.ROBOFORM_SELECTORS, ...this.PASSWORD_MANAGER_SELECTORS];
     for (const selector of allSelectors) {
@@ -43,7 +43,7 @@
         return true;
       }
     }
-    
+
     // Check for password manager classes
     const classList = element.classList ? Array.from(element.classList) : [];
     return classList.some(cls => 
@@ -55,14 +55,14 @@
       cls.includes('bitwarden')
     );
   },
-  
+
   // Mark field as managed by our extension
   markFieldAsOurs: function(element) {
     if (element) {
       element.setAttribute(`data-${this.NAMESPACE}`, 'true');
     }
   },
-  
+
   // Check if field is already managed by our extension
   isOurField: function(element) {
     return element && element.getAttribute(`data-${this.NAMESPACE}`) === 'true';
@@ -71,14 +71,14 @@
 
 // Global message listener
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-  
+
   if (request.action === 'fillFields') {
     try {
       // Check for conflicts before filling
       if (AutofillExtension.hasPasswordManagerConflict()) {
         console.log('Password manager detected, proceeding with caution');
       }
-      
+
       fillFields(request.fields).then(result => {
         sendResponse({status: 'success', result: result});
       }).catch(error => {
@@ -91,7 +91,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     }
     return true;
   } 
-  
+
   else if (request.action === 'startFieldSelector') {
     try {
       startFieldSelector();
@@ -102,26 +102,26 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     }
     return true;
   } 
-  
+
   else if (request.action === 'showNotification') {
     showNotification(request.message, request.type, request.duration);
     sendResponse({status: 'success'});
     return true;
   } 
-  
+
   else if (request.action === 'showSurveyAutofilledNotification') {
     console.log('Received showSurveyAutofilledNotification request:', request.surveyData);
     showSurveyAutofilledNotification(request.surveyData);
     sendResponse({status: 'success', message: 'Survey notification shown'});
     return true;
   } 
-  
+
   else if (request.action === 'detectFields') {
     const detectedFields = detectPageFields();
     sendResponse({status: 'success', fields: detectedFields});
     return true;
   } 
-  
+
   else if (request.action === 'testField') {
     try {
       const field = request.field;
@@ -133,25 +133,25 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         });
         return true;
       }
-      
+
       const element = findElementBySelector(field);
-      
+
       let details = '';
       if (element) {
         const tagName = element.tagName.toLowerCase();
         const type = (element.type || '').toLowerCase();
-        
+
         details = `Found <${tagName}> element`;
         if (type) details += ` of type "${type}"`;
-        
+
         if (element.value !== undefined) {
           details += `, current value: "${element.value}"`;
         }
-        
+
         const rect = element.getBoundingClientRect();
         details += `<br>Position: ${Math.round(rect.left)},${Math.round(rect.top)} - Size: ${Math.round(rect.width)}x${Math.round(rect.height)}`;
       }
-      
+
       sendResponse({
         status: 'success',
         found: !!element,
@@ -163,7 +163,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     }
     return true;
   }
-  
+
   else if (request.action === 'detectSurveyInIframes') {
     try {
       const iframeSurveyData = detectSurveyInIframes();
@@ -174,7 +174,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     }
     return true;
   }
-  
+
   else if (request.action === 'testRegexPattern') {
     try {
       const matches = testRegexPattern(request.pattern, request.selectorType);
@@ -185,7 +185,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     }
     return true;
   }
-  
+
   else if (request.action === 'highlightRegexMatches') {
     try {
       highlightRegexMatches(request.pattern, request.selectorType);
@@ -203,22 +203,22 @@ function isValidFieldObject(field) {
   if (!field || typeof field !== 'object') {
     return false;
   }
-  
+
   // Must have either a selector or allSelectors
   if (!field.selector && (!field.allSelectors || !Array.isArray(field.allSelectors) || field.allSelectors.length === 0)) {
     return false;
   }
-  
+
   // Must have a selector type if it has a selector
   if (field.selector && !field.selectorType) {
     return false;
   }
-  
+
   // Should have a value
   if (field.value === undefined || field.value === null) {
     return false;
   }
-  
+
   return true;
 }
 
@@ -227,7 +227,7 @@ function cssEscape(value) {
   if (typeof CSS !== 'undefined' && CSS.escape) {
     return CSS.escape(value);
   }
-  
+
   // Simple fallback for basic cases
   return value.replace(/[^\w-]/g, '\\$&');
 }
@@ -259,17 +259,17 @@ const NotificationManager = {
   show(message, type = 'success', duration = 3000) {
     const notification = document.createElement('div');
     notification.textContent = message;
-    
+
     // Apply styles
     Object.assign(notification.style, this.defaultStyles);
     notification.style.backgroundColor = this.typeColors[type] || this.typeColors.info;
-    
+
     if (type === 'warning') {
       notification.style.color = '#333';
     }
-    
+
     document.body.appendChild(notification);
-    
+
     setTimeout(() => {
       if (document.body.contains(notification)) {
         document.body.removeChild(notification);
@@ -298,7 +298,7 @@ function showNotification(message, type = 'success', duration = 3000) {
     word-wrap: break-word !important;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
   `;
-  
+
   switch (type) {
     case 'success':
       notification.style.backgroundColor = '#34a853';
@@ -316,9 +316,9 @@ function showNotification(message, type = 'success', duration = 3000) {
     default:
       notification.style.backgroundColor = '#4285f4';
   }
-  
+
   document.body.appendChild(notification);
-  
+
   setTimeout(function() {
     if (document.body.contains(notification)) {
       document.body.removeChild(notification);
@@ -331,12 +331,12 @@ function showSurveyAutofilledNotification(surveyData) {
   console.log('showSurveyAutofilledNotification called with:', surveyData);
   console.log('Type of surveyData.urlSegments:', typeof surveyData.urlSegments);
 
-  
+
   if (!surveyData) {
     console.error('No survey data provided for notification');
     return;
   }
-  
+
   try {
     // Remove any existing notification
     const existingNotification = document.getElementById('survey-autofill-notification');
@@ -344,7 +344,7 @@ function showSurveyAutofilledNotification(surveyData) {
       console.log('Removing existing notification');
       existingNotification.remove();
     }
-    
+
     // Ensure we have URL segments with fallbacks
     if (!surveyData.urlSegments || !Array.isArray(surveyData.urlSegments)) {
       console.warn('Invalid urlSegments, creating fallback');
@@ -353,10 +353,10 @@ function showSurveyAutofilledNotification(surveyData) {
         { type: 'path', value: surveyData.id || 'survey', display: surveyData.id || 'survey', selectable: true }
       ];
     }
-    
+
     const container = document.createElement('div');
     container.id = 'survey-autofill-notification';
-    
+
     // Enhanced styling for reliability
     container.style.cssText = `
       position: fixed !important;
@@ -376,7 +376,7 @@ function showSurveyAutofilledNotification(surveyData) {
       border: 2px solid rgba(255,255,255,0.3) !important;
       animation: slideInRight 0.3s ease-out !important;
     `;
-    
+
     // Add keyframe animation
     if (!document.getElementById('survey-notification-styles')) {
       const style = document.createElement('style');
@@ -417,11 +417,11 @@ function showSurveyAutofilledNotification(surveyData) {
       `;
       document.head.appendChild(style);
     }
-    
+
     const platform = (surveyData.platform || 'Survey').replace(/[<>"'&]/g, '');
     const fieldsCount = parseInt(surveyData.fieldsFilledCount) || 0;
     const wasAutofilled = surveyData.autofilled && fieldsCount > 0;
-    
+
     container.innerHTML = `
       <div style="display: flex; align-items: center; margin-bottom: 12px;">
         <span style="font-size: 24px; margin-right: 10px; background: #fff; color: #667eea; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: bold;">${wasAutofilled ? 'AF' : 'S'}</span>
@@ -444,18 +444,18 @@ function showSurveyAutofilledNotification(surveyData) {
           justify-content: center !important;
         ">×</button>
       </div>
-      
+
       <div style="margin-bottom: 12px; font-size: 14px;">
         Select a URL segment that uniquely identifies this survey:
       </div>
-      
+
       <div id="url-segments" style="margin-bottom: 15px; min-height: 40px;">
         ${surveyData.urlSegments.map((segment, index) => {
           const isSelectable = segment.selectable !== false;
           const segmentClass = isSelectable ? 'url-segment' : 'url-segment domain';
           const escapedValue = (segment.value || '').replace(/[<>"'&]/g, '');
           const escapedDisplay = (segment.display || segment.value || '').replace(/[<>"'&]/g, '');
-          
+
           return `<span class="${segmentClass}" 
                 data-index="${index}" 
                 data-value="${escapedValue}" 
@@ -464,7 +464,7 @@ function showSurveyAutofilledNotification(surveyData) {
            </span>`;
         }).join('')}
       </div>
-      
+
       <div id="selected-id-display" style="
         background: #34a853 !important;
         color: white !important;
@@ -476,7 +476,7 @@ function showSurveyAutofilledNotification(surveyData) {
         display: none !important;
         word-break: break-all !important;
       "></div>
-      
+
       <div style="display: flex; gap: 8px; align-items: center;">
         <button id="auto-detect-id" style="
           background: rgba(255,255,255,0.2) !important;
@@ -487,7 +487,7 @@ function showSurveyAutofilledNotification(surveyData) {
           cursor: pointer !important;
           font-size: 12px !important;
         ">Auto-detect</button>
-        
+
         <button id="skip-tracking" style="
           background: none !important;
           border: 1px solid rgba(255,255,255,0.3) !important;
@@ -497,7 +497,7 @@ function showSurveyAutofilledNotification(surveyData) {
           cursor: pointer !important;
           font-size: 12px !important;
         ">Skip</button>
-        
+
         <button id="confirm-survey-id" style="
           background: #34a853 !important;
           border: none !important;
@@ -510,7 +510,7 @@ function showSurveyAutofilledNotification(surveyData) {
           margin-left: auto !important;
         " disabled>Confirm</button>
       </div>
-      
+
       <div id="selected-preview" style="
         margin-top: 10px !important;
         font-size: 12px !important;
@@ -518,11 +518,11 @@ function showSurveyAutofilledNotification(surveyData) {
         color: white !important;
       "></div>
     `;
-    
+
     document.body.appendChild(container);
-    
+
     let selectedSegment = null;
-    
+
     // Set up URL segment click handlers
     container.querySelectorAll('.url-segment').forEach(segment => {
       if (segment.dataset.selectable !== 'false') {
@@ -531,7 +531,7 @@ function showSurveyAutofilledNotification(surveyData) {
           container.querySelectorAll('.url-segment.selected').forEach(s => 
             s.classList.remove('selected')
           );
-          
+
           // Select this segment
           this.classList.add('selected');
           selectedSegment = {
@@ -539,21 +539,21 @@ function showSurveyAutofilledNotification(surveyData) {
             value: this.dataset.value,
             display: this.textContent.trim()
           };
-          
+
           // Update UI
           const preview = container.querySelector('#selected-preview');
           const confirmBtn = container.querySelector('#confirm-survey-id');
           const selectedDisplay = container.querySelector('#selected-id-display');
-          
+
           if (selectedDisplay) {
             selectedDisplay.textContent = `Survey ID: ${selectedSegment.value}`;
             selectedDisplay.style.display = 'block';
           }
-          
+
           if (preview) {
             preview.textContent = `Selected: ${selectedSegment.value}`;
           }
-          
+
           if (confirmBtn) {
             confirmBtn.disabled = false;
             confirmBtn.style.opacity = '1';
@@ -561,7 +561,7 @@ function showSurveyAutofilledNotification(surveyData) {
         });
       }
     });
-    
+
     // Auto-detect ID button
     const autoDetectBtn = container.querySelector('#auto-detect-id');
     if (autoDetectBtn) {
@@ -569,35 +569,35 @@ function showSurveyAutofilledNotification(surveyData) {
         const segments = surveyData.urlSegments.filter(s => s.selectable !== false);
         let bestSegment = null;
         let bestScore = 0;
-        
+
         segments.forEach((segment, index) => {
           let score = 0;
           const value = segment.value || '';
-          
+
           // Prefer longer values
           score += Math.min(value.length, 20);
-          
+
           // Prefer alphanumeric
           const alphanumeric = value.match(/[a-zA-Z0-9]/g);
           if (alphanumeric) {
             score += alphanumeric.length * 2;
           }
-          
+
           // Prefer typical ID patterns
           if (/^[a-zA-Z0-9]{6,}$/.test(value)) score += 20;
           if (/^[A-Z0-9\-_]{8,}$/i.test(value)) score += 15;
-          
+
           // Avoid common path segments
           if (['r', 'to', 'd', 'forms', 'survey', 'e'].includes(value.toLowerCase())) {
             score -= 50;
           }
-          
+
           if (score > bestScore) {
             bestScore = score;
             bestSegment = { ...segment, index: index };
           }
         });
-        
+
         if (bestSegment) {
           const segmentElement = container.querySelector(`[data-index="${bestSegment.index}"]`);
           if (segmentElement) {
@@ -606,7 +606,7 @@ function showSurveyAutofilledNotification(surveyData) {
         }
       });
     }
-    
+
     // Skip tracking button
     const skipBtn = container.querySelector('#skip-tracking');
     if (skipBtn) {
@@ -620,7 +620,7 @@ function showSurveyAutofilledNotification(surveyData) {
         container.remove();
       });
     }
-    
+
     // Confirm survey ID button
     const confirmBtn = container.querySelector('#confirm-survey-id');
     if (confirmBtn) {
@@ -633,13 +633,13 @@ function showSurveyAutofilledNotification(surveyData) {
               selectedSegment: selectedSegment
             });
           }
-          
+
           showNotification(`Survey "${selectedSegment.value}" marked as IN PROGRESS!`, 'success');
           container.remove();
         }
       });
     }
-    
+
     // Close button
     const closeBtn = container.querySelector('#close-survey-notification');
     if (closeBtn) {
@@ -647,14 +647,14 @@ function showSurveyAutofilledNotification(surveyData) {
         container.remove();
       });
     }
-    
+
     // Auto-remove after 30 seconds
     setTimeout(() => {
       if (container && container.parentNode) {
         container.remove();
       }
     }, 30000);
-    
+
   } catch (error) {
     console.error('Error in showSurveyAutofilledNotification:', error);
     // Fallback notification
@@ -666,10 +666,10 @@ function showSurveyAutofilledNotification(surveyData) {
 const FieldManager = {
   async fill(fields) {
     if (!Array.isArray(fields)) return [];
-    
+
     const validFields = fields.filter(field => this.isValid(field));
     const fillPromises = validFields.map(field => this.fillSingle(field));
-    
+
     return Promise.all(fillPromises);
   },
 
@@ -685,7 +685,7 @@ const FieldManager = {
     return new Promise(resolve => {
       try {
         const element = this.findElement(field);
-        
+
         if (element && this.isSafeToFill(element) && this.isVisible(element)) {
           if (AutofillExtension.isFieldManagedByOther(element)) {
             resolve({
@@ -697,10 +697,10 @@ const FieldManager = {
             });
             return;
           }
-          
+
           AutofillExtension.markFieldAsOurs(element);
           const success = this.fillElement(element, field.value);
-          
+
           resolve({
             id: field.id || 'unknown',
             status: success ? 'success' : 'error',
@@ -754,7 +754,7 @@ function fillFields(fields) {
     console.error("Invalid fields parameter:", fields);
     return Promise.resolve([]);
   }
-  
+
   // Filter valid fields
   const validFields = fields.filter(field => {
     if (!isValidFieldObject(field)) {
@@ -763,12 +763,12 @@ function fillFields(fields) {
     }
     return true;
   });
-  
+
   const promises = validFields.map(field => {
     return new Promise((resolve) => {
       try {
         const element = findElementBySelector(field);
-        
+
         if (element && isSafeToFill(element) && isElementVisible(element)) {
           // Check for conflicts before filling
           if (AutofillExtension.isFieldManagedByOther(element)) {
@@ -782,16 +782,16 @@ function fillFields(fields) {
             });
             return;
           }
-          
+
           // Check if we already manage this field
           if (AutofillExtension.isOurField(element)) {
             console.log('Field already managed by our extension, proceeding');
           }
-          
+
           // Mark as ours and fill
           AutofillExtension.markFieldAsOurs(element);
           const success = fillElement(element, field.value);
-          
+
           if (success) {
             resolve({
               id: field.id || 'unknown',
@@ -829,7 +829,7 @@ function fillFields(fields) {
       }
     });
   });
-  
+
   return Promise.all(promises);
 }
 
@@ -838,29 +838,29 @@ function isSafeToFill(element) {
   if (!element || !element.tagName) {
     return false;
   }
-  
+
   const tagName = element.tagName.toLowerCase();
   const type = (element.type || '').toLowerCase();
-  
+
   // NEVER fill password fields to avoid conflicts with password managers
   if (type === 'password') {
     console.log('Skipping password field to avoid conflicts');
     return false;
   }
-  
+
   // Skip fields with autocomplete="new-password" or "current-password"
   const autocomplete = (element.getAttribute('autocomplete') || '').toLowerCase();
   if (autocomplete.includes('password')) {
     console.log('Skipping field with password autocomplete');
     return false;
   }
-  
+
   // Check if managed by another extension
   if (AutofillExtension.isFieldManagedByOther(element)) {
     console.log('Skipping field managed by other extension');
     return false;
   }
-  
+
   // Fix className handling - ensure it's always a string
   let className = '';
   try {
@@ -872,27 +872,27 @@ function isSafeToFill(element) {
   } catch (error) {
     className = '';
   }
-  
+
   const id = (element.id || '').toLowerCase();
   const role = (element.getAttribute('role') || '').toLowerCase();
-  
+
   // Block dangerous elements
   const dangerousElements = ['button', 'script', 'style', 'meta', 'link'];
   if (dangerousElements.includes(tagName)) {
     return false;
   }
-  
+
   // Block dangerous input types
   const dangerousTypes = ['button', 'submit', 'reset', 'image', 'hidden'];
   if (tagName === 'input' && dangerousTypes.includes(type)) {
     return false;
   }
-  
+
   // Block button-like elements
   if (role === 'button' || element.onclick !== null) {
     return false;
   }
-  
+
   // Only check for button-like patterns if it's NOT a radio button or checkbox
   if (tagName !== 'input' || (type !== 'radio' && type !== 'checkbox')) {
     const textContent = (element.textContent || '').toLowerCase();
@@ -900,13 +900,13 @@ function isSafeToFill(element) {
       /submit/i, /send/i, /next/i, /continue/i, /finish/i, /complete/i,
       /save/i, /cancel/i, /close/i, /back/i, /skip/i, /button/i, /btn/i
     ];
-    
+
     const allText = `${className} ${id} ${textContent}`.toLowerCase();
     if (buttonPatterns.some(pattern => pattern.test(allText))) {
       return false;
     }
   }
-  
+
   // Only allow safe form elements
   const safeElements = ['input', 'select', 'textarea'];
   if (!safeElements.includes(tagName)) {
@@ -915,7 +915,7 @@ function isSafeToFill(element) {
       return false;
     }
   }
-  
+
   // Additional safety for input elements
   if (tagName === 'input') {
     const safeInputTypes = ['text', 'email', 'tel', 'number', 'date', 'time', 'url', 'search', 'checkbox', 'radio'];
@@ -923,7 +923,7 @@ function isSafeToFill(element) {
       return false;
     }
   }
-  
+
   return true;
 }
 
@@ -933,21 +933,21 @@ function isElementVisible(element) {
     if (!element || element.offsetParent === null) {
       return false;
     }
-    
+
     const style = window.getComputedStyle(element);
     if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
       return false;
     }
-    
+
     const rect = element.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) {
       return false;
     }
-    
+
     if (element.disabled || element.readOnly) {
       return false;
     }
-    
+
     return true;
   } catch (error) {
     return false;
@@ -957,40 +957,40 @@ function isElementVisible(element) {
 // Enhanced field detection that only shows populated fields
 function detectPageFields() {
   const detectedFields = [];
-  
+
   try {
     const inputElements = document.querySelectorAll('input, select, textarea');
-    
+
     inputElements.forEach(element => {
       // Skip if managed by other extension
       if (AutofillExtension.isFieldManagedByOther(element)) {
         console.log('Skipping field detection for element managed by other extension');
         return;
       }
-      
+
       if (!isSafeToFill(element) || !isElementVisible(element)) {
         return;
       }
-      
+
       // Only include fields that have values (are populated)
       const value = getElementValue(element);
       if (!value || value.trim() === '' || value === 'false') {
         return; // Skip empty fields and unchecked checkboxes
       }
-      
+
       // For checkboxes and radio buttons, only include if checked
       const type = (element.type || '').toLowerCase();
       if ((type === 'checkbox' || type === 'radio') && !element.checked) {
         return;
       }
-      
+
       const allSelectors = getAllSelectorsForElement(element);
       const suggestion = generateSelectorSuggestion(element, allSelectors);
-      
+
       if (!allSelectors || allSelectors.length === 0) {
         return;
       }
-      
+
       const field = {
         selector: suggestion ? suggestion.recommendedSelector.value : allSelectors[0].value,
         selectorType: suggestion ? suggestion.recommendedSelector.type : allSelectors[0].type,
@@ -1000,10 +1000,10 @@ function detectPageFields() {
         suggestion: suggestion,
         confidence: suggestion ? suggestion.recommendedSelector.confidence : 50
       };
-      
+
       detectedFields.push(field);
     });
-    
+
     // Sort by confidence (highest first), then by label
     detectedFields.sort((a, b) => {
       if (a.confidence !== b.confidence) {
@@ -1017,14 +1017,14 @@ function detectPageFields() {
   } catch (error) {
     console.error("Error detecting fields:", error);
   }
-  
+
   return detectedFields;
 }
 
 // Generate multiple selector options for a field
 function getAllSelectorsForElement(element) {
   const selectors = [];
-  
+
   // ID selector
   if (element.id) {
     selectors.push({
@@ -1034,7 +1034,7 @@ function getAllSelectorsForElement(element) {
       priority: 1
     });
   }
-  
+
   // Name selector
   if (element.name) {
     selectors.push({
@@ -1044,7 +1044,7 @@ function getAllSelectorsForElement(element) {
       priority: 2
     });
   }
-  
+
   // CSS selector
   try {
     const cssSelector = generateCssSelector(element);
@@ -1059,7 +1059,7 @@ function getAllSelectorsForElement(element) {
   } catch (error) {
     console.error("Error generating CSS selector:", error);
   }
-  
+
   // Placeholder selector
   if (element.placeholder) {
     selectors.push({
@@ -1069,7 +1069,7 @@ function getAllSelectorsForElement(element) {
       priority: 4
     });
   }
-  
+
   // ARIA label selector
   if (element.getAttribute('aria-label')) {
     selectors.push({
@@ -1079,7 +1079,7 @@ function getAllSelectorsForElement(element) {
       priority: 5
     });
   }
-  
+
   // Label text selector
   const labelText = getElementLabel(element);
   if (labelText) {
@@ -1090,7 +1090,7 @@ function getAllSelectorsForElement(element) {
       priority: 6
     });
   }
-  
+
   // Data attributes
   Array.from(element.attributes).forEach(attr => {
     if (attr.name.startsWith('data-') && attr.value) {
@@ -1102,7 +1102,7 @@ function getAllSelectorsForElement(element) {
       });
     }
   });
-  
+
   // Class-based selectors (individual classes)
   if (element.classList && element.classList.length > 0) {
     Array.from(element.classList).forEach(className => {
@@ -1116,7 +1116,7 @@ function getAllSelectorsForElement(element) {
       }
     });
   }
-  
+
   // XPath selector
   try {
     const xpath = generateXPath(element);
@@ -1131,7 +1131,7 @@ function getAllSelectorsForElement(element) {
   } catch (error) {
     console.error("Error generating XPath:", error);
   }
-  
+
   // Type-based selector for inputs
   if (element.tagName.toLowerCase() === 'input' && element.type) {
     selectors.push({
@@ -1141,10 +1141,10 @@ function getAllSelectorsForElement(element) {
       priority: 10
     });
   }
-  
+
   // Sort by priority
   selectors.sort((a, b) => a.priority - b.priority);
-  
+
   return selectors;
 }
 
@@ -1159,13 +1159,13 @@ function generateXPath(element) {
   if (element.id) {
     return `//*[@id="${element.id}"]`;
   }
-  
+
   let path = '';
   let current = element;
-  
+
   while (current && current.nodeType === Node.ELEMENT_NODE) {
     let selector = current.tagName.toLowerCase();
-    
+
     if (current.id) {
       selector = `*[@id="${current.id}"]`;
       path = '//' + selector + path;
@@ -1173,22 +1173,22 @@ function generateXPath(element) {
     } else {
       let sibling = current;
       let nth = 1;
-      
+
       while (sibling = sibling.previousElementSibling) {
         if (sibling.tagName.toLowerCase() === current.tagName.toLowerCase()) {
           nth++;
         }
       }
-      
+
       if (nth > 1) {
         selector += `[${nth}]`;
       }
     }
-    
+
     path = '/' + selector + path;
     current = current.parentElement;
   }
-  
+
   return path;
 }
 
@@ -1197,22 +1197,22 @@ function generateCssSelector(element) {
   if (element.id) {
     return `#${cssEscape(element.id)}`;
   }
-  
+
   const tagName = element.tagName.toLowerCase();
   let selector = tagName;
-  
+
   // Add type for input elements
   if (tagName === 'input' && element.type) {
     selector += `[type="${element.type}"]`;
   }
-  
+
   // Add other important attributes
   ['placeholder', 'name'].forEach(attr => {
     if (element.getAttribute(attr)) {
       selector += `[${attr}="${cssEscape(element.getAttribute(attr))}"]`;
     }
   });
-  
+
   // Check if selector is unique
   try {
     if (document.querySelectorAll(selector).length === 1) {
@@ -1221,14 +1221,14 @@ function generateCssSelector(element) {
   } catch (error) {
     console.error("Error with selector:", selector, error);
   }
-  
+
   // Add parent context if needed
   let current = element;
   let contextSelector = selector;
-  
+
   for (let i = 0; i < 3 && current.parentElement; i++) {
     current = current.parentElement;
-    
+
     if (current.id) {
       contextSelector = `#${cssEscape(current.id)} ${contextSelector}`;
       break;
@@ -1236,7 +1236,7 @@ function generateCssSelector(element) {
       const parentClass = Array.from(current.classList)[0];
       contextSelector = `.${cssEscape(parentClass)} ${contextSelector}`;
     }
-    
+
     try {
       if (document.querySelectorAll(contextSelector).length === 1) {
         break;
@@ -1245,7 +1245,7 @@ function generateCssSelector(element) {
       break;
     }
   }
-  
+
   return contextSelector;
 }
 
@@ -1261,12 +1261,12 @@ function findElementBySelector(field) {
         }
       }
     }
-    
+
     // Try main selector
     if (field.selector && field.selectorType) {
       return findElementBySelectorType(field.selector, field.selectorType);
     }
-    
+
     return null;
   } catch (error) {
     console.error("Error finding element:", error);
@@ -1293,7 +1293,7 @@ function findElementBySelectorType(selector, type) {
         return result.singleNodeValue;
       case 'label':
         return getElementByLabelText(selector);
-      
+
       // Regex selector types
       case 'regex-label':
         return getElementByRegexLabel(selector);
@@ -1309,7 +1309,7 @@ function findElementBySelectorType(selector, type) {
         return getElementByRegexContent(selector);
       case 'regex-value':
         return getElementByRegexAttribute('value', selector);
-      
+
       // Legacy selector types for backward compatibility
       case 'closest-text':
         return getElementByClosestText(selector);
@@ -1325,7 +1325,7 @@ function findElementBySelectorType(selector, type) {
       case 'regex-attr':
         const [regexAttr, regexPattern] = selector.split('=', 2);
         return getElementByRegexAttribute(regexAttr, regexPattern);
-      
+
       default:
         console.warn("Unknown selector type:", type);
         return null;
@@ -1344,7 +1344,7 @@ function getElementByLabelText(text) {
       if (label.htmlFor) {
         return document.getElementById(label.htmlFor);
       }
-      
+
       const input = label.querySelector('input, select, textarea');
       if (input) {
         return input;
@@ -1363,7 +1363,7 @@ function getElementLabel(element) {
       return label.textContent.trim();
     }
   }
-  
+
   // Try parent label
   let parent = element.parentElement;
   while (parent) {
@@ -1372,33 +1372,33 @@ function getElementLabel(element) {
     }
     parent = parent.parentElement;
   }
-  
+
   // Try aria-label
   if (element.getAttribute('aria-label')) {
     return element.getAttribute('aria-label');
   }
-  
+
   // Try placeholder
   if (element.placeholder) {
     return element.placeholder;
   }
-  
+
   // Try previous sibling text
   let prevSibling = element.previousElementSibling;
   if (prevSibling && prevSibling.textContent) {
     return prevSibling.textContent.trim();
   }
-  
+
   return '';
 }
 
 // Get element value
 function getElementValue(element) {
   if (!element) return '';
-  
+
   const tagName = element.tagName.toLowerCase();
   const type = (element.type || '').toLowerCase();
-  
+
   if (tagName === 'input') {
     if (type === 'checkbox' || type === 'radio') {
       return element.checked ? 'true' : 'false';
@@ -1411,7 +1411,7 @@ function getElementValue(element) {
   } else if (element.contentEditable === 'true') {
     return element.textContent;
   }
-  
+
   return '';
 }
 
@@ -1420,25 +1420,25 @@ function fillElement(element, value) {
   if (!element || !element.tagName) {
     return false;
   }
-  
+
   const tagName = element.tagName.toLowerCase();
   const type = (element.type || '').toLowerCase();
-  
+
   if (!isSafeToFill(element)) {
     console.warn("Attempted to fill unsafe element:", element);
     return false;
   }
-  
+
   // Double-check for password field
   if (type === 'password') {
     console.warn("Refusing to fill password field");
     return false;
   }
-  
+
   try {
     // Focus element
     element.focus();
-    
+
     if (tagName === 'input') {
       if (type === 'checkbox' || type === 'radio') {
         const isChecked = ['true', 'yes', '1', 'checked', 'on'].includes(String(value).toLowerCase());
@@ -1457,7 +1457,7 @@ function fillElement(element, value) {
         opt.value.toLowerCase() === String(value).toLowerCase() ||
         opt.text.toLowerCase() === String(value).toLowerCase()
       );
-      
+
       if (option) {
         element.value = option.value;
       } else {
@@ -1472,12 +1472,12 @@ function fillElement(element, value) {
       console.warn("Unsupported element type:", tagName);
       return false;
     }
-    
+
     // Trigger events
     element.dispatchEvent(new Event('input', { bubbles: true }));
     element.dispatchEvent(new Event('change', { bubbles: true }));
     element.blur();
-    
+
     return true;
   } catch (error) {
     console.error("Error filling element:", error);
@@ -1490,16 +1490,16 @@ function formatDateValue(value) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return value;
   }
-  
+
   const date = new Date(value);
   if (isNaN(date.getTime())) {
     return value;
   }
-  
+
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
-  
+
   return `${year}-${month}-${day}`;
 }
 
@@ -1508,44 +1508,44 @@ function startFieldSelector() {
   chrome.storage.local.get('options', function(data) {
     const options = data.options || {};
     const selectorColor = options.selectorColor || "#ea4335";
-    
+
     addHighlightStyles(selectorColor);
-    
+
     let isSelectionActive = true;
     let currentHighlight = null;
-    
+
     function handleMouseOver(event) {
       if (!isSelectionActive || !isTargetable(event.target)) return;
-      
+
       // Skip if managed by other extension
       if (AutofillExtension.isFieldManagedByOther(event.target)) {
         return;
       }
-      
+
       if (currentHighlight) {
         currentHighlight.classList.remove('autofill-highlight');
       }
-      
+
       currentHighlight = event.target;
       currentHighlight.classList.add('autofill-highlight');
     }
-    
+
     function handleClick(event) {
       if (!isSelectionActive || !isTargetable(event.target)) return;
-      
+
       // Skip if managed by other extension
       if (AutofillExtension.isFieldManagedByOther(event.target)) {
         showNotification('This field is managed by another extension', 'warning');
         return;
       }
-      
+
       event.preventDefault();
       event.stopPropagation();
-      
+
       const element = event.target;
       const allSelectors = getAllSelectorsForElement(element);
       const suggestion = generateSelectorSuggestion(element, allSelectors);
-      
+
       if (suggestion && isSafeToFill(element)) {
         const fieldData = {
           selector: suggestion.recommendedSelector.value,
@@ -1561,11 +1561,11 @@ function startFieldSelector() {
           type: element.type || '',
           placeholder: element.placeholder || ''
         };
-        
+
         cleanup();
-        
+
         showNotification('Field selected with intelligent suggestion!', 'success');
-        
+
         chrome.runtime.sendMessage({
           action: 'fieldSelected',
           data: fieldData
@@ -1574,32 +1574,32 @@ function startFieldSelector() {
         showNotification('Selected element is not safe for autofill', 'warning');
       }
     }
-    
+
     function handleKeyPress(event) {
       if (event.key === 'Escape') {
         cleanup();
         showNotification('Field selection cancelled', 'info');
       }
     }
-    
+
     function cleanup() {
       isSelectionActive = false;
       document.removeEventListener('mouseover', handleMouseOver);
       document.removeEventListener('click', handleClick);
       document.removeEventListener('keydown', handleKeyPress);
-      
+
       document.querySelectorAll('.autofill-highlight').forEach(el => {
         el.classList.remove('autofill-highlight');
       });
-      
+
       const styleEl = document.getElementById('autofill-styles');
       if (styleEl) styleEl.remove();
     }
-    
+
     document.addEventListener('mouseover', handleMouseOver);
     document.addEventListener('click', handleClick);
     document.addEventListener('keydown', handleKeyPress);
-    
+
     // Auto-cancel after 30 seconds
     setTimeout(() => {
       if (isSelectionActive) {
@@ -1616,7 +1616,7 @@ function addHighlightStyles(color) {
   if (existingStyle) {
     existingStyle.remove();
   }
-  
+
   const styleEl = document.createElement('style');
   styleEl.id = 'autofill-styles';
   styleEl.textContent = `
@@ -1634,40 +1634,40 @@ function addHighlightStyles(color) {
 // Enhanced check if element is targetable for selection
 function isTargetable(element) {
   if (!element || !element.tagName) return false;
-  
+
   const tagName = element.tagName.toLowerCase();
   const type = (element.type || '').toLowerCase();
-  
+
   // Never target password fields
   if (type === 'password') {
     return false;
   }
-  
+
   // Skip fields managed by other extensions
   if (AutofillExtension.isFieldManagedByOther(element)) {
     return false;
   }
-  
+
   // Block dangerous elements
   if (['button', 'script', 'style'].includes(tagName)) {
     return false;
   }
-  
+
   // Block dangerous input types
   if (tagName === 'input' && ['button', 'submit', 'reset', 'image', 'hidden'].includes(type)) {
     return false;
   }
-  
+
   // Allow safe form elements
   if (['input', 'select', 'textarea'].includes(tagName)) {
     return true;
   }
-  
+
   // Allow contenteditable
   if (element.contentEditable === 'true' || element.isContentEditable) {
     return true;
   }
-  
+
   return false;
 }
 
@@ -1687,14 +1687,14 @@ function getElementByClosestText(text) {
       }
     }
   );
-  
+
   while (walker.nextNode()) {
     textNodes.push(walker.currentNode);
   }
-  
+
   for (const node of textNodes) {
     let element = node.parentNode;
-    
+
     // Look for input in next sibling
     let sibling = element.nextElementSibling;
     while (sibling && !isTargetable(sibling)) {
@@ -1703,7 +1703,7 @@ function getElementByClosestText(text) {
       sibling = sibling.nextElementSibling;
     }
     if (sibling && isTargetable(sibling)) return sibling;
-    
+
     // Look in parent
     const parent = element.parentNode;
     if (parent) {
@@ -1711,7 +1711,7 @@ function getElementByClosestText(text) {
       if (input && isTargetable(input)) return input;
     }
   }
-  
+
   return null;
 }
 
@@ -1719,10 +1719,10 @@ function getElementByClosestText(text) {
 function getElementByRegexLabel(pattern) {
   try {
     const regex = new RegExp(pattern, 'i');
-    
+
     // First try to find labels that match the pattern
     const labels = Array.from(document.querySelectorAll('label'));
-    
+
     for (const label of labels) {
       if (regex.test(label.textContent.trim())) {
         // If label has a 'for' attribute, find the associated element
@@ -1732,7 +1732,7 @@ function getElementByRegexLabel(pattern) {
             return element;
           }
         }
-        
+
         // Otherwise, look for form elements inside the label
         const input = label.querySelector('input:not([type="hidden"]), select, textarea');
         if (input && isTargetable(input)) {
@@ -1740,7 +1740,7 @@ function getElementByRegexLabel(pattern) {
         }
       }
     }
-    
+
     // Also check aria-label attributes
     const ariaElements = Array.from(document.querySelectorAll('[aria-label]'));
     for (const element of ariaElements) {
@@ -1748,10 +1748,10 @@ function getElementByRegexLabel(pattern) {
         return element;
       }
     }
-    
+
     // Check for text near form fields (for survey questions without proper labels)
     const formElements = Array.from(document.querySelectorAll('input:not([type="hidden"]), select, textarea'));
-    
+
     for (const element of formElements) {
       // Check previous siblings for text
       let prevSibling = element.previousElementSibling;
@@ -1761,7 +1761,7 @@ function getElementByRegexLabel(pattern) {
         }
         prevSibling = prevSibling.previousElementSibling;
       }
-      
+
       // Check parent's text (but not including the input's value)
       const parent = element.parentElement;
       if (parent) {
@@ -1769,13 +1769,13 @@ function getElementByRegexLabel(pattern) {
         // Remove the input element from the clone to get just the label text
         const inputsInClone = parentClone.querySelectorAll('input, select, textarea');
         inputsInClone.forEach(el => el.remove());
-        
+
         if (regex.test(parentClone.textContent.trim())) {
           return element;
         }
       }
     }
-    
+
     return null;
   } catch (error) {
     console.error("Error in regex label matching:", error);
@@ -1787,7 +1787,7 @@ function getElementByRegexLabel(pattern) {
 function getElementByRegex(attribute, pattern) {
   try {
     const regex = new RegExp(pattern, 'i');
-    
+
     let elements;
     if (attribute === 'id') {
       elements = Array.from(document.querySelectorAll('[id]'));
@@ -1799,7 +1799,7 @@ function getElementByRegex(attribute, pattern) {
       elements = Array.from(document.querySelectorAll('[class]'));
       return elements.find(el => regex.test(el.className) && isTargetable(el)) || null;
     }
-    
+
     return null;
   } catch (error) {
     console.error("Error in regex matching:", error);
@@ -1815,17 +1815,17 @@ function getElementByRegexAttribute(attributeName, pattern) {
       const [attrName, attrPattern] = attributeName.split('=', 2);
       const regex = new RegExp(attrPattern || pattern, 'i');
       const elements = Array.from(document.querySelectorAll(`[${attrName}]`));
-      
+
       return elements.find(el => {
         const attrValue = el.getAttribute(attrName);
         return attrValue && regex.test(attrValue) && isTargetable(el);
       }) || null;
     }
-    
+
     // Regular attribute matching
     const regex = new RegExp(pattern, 'i');
     const elements = Array.from(document.querySelectorAll(`[${attributeName}]`));
-    
+
     return elements.find(el => {
       const attrValue = el.getAttribute(attributeName);
       return attrValue && regex.test(attrValue) && isTargetable(el);
@@ -1840,13 +1840,13 @@ function getElementByRegexAttribute(attributeName, pattern) {
 function getElementByRegexContent(pattern) {
   try {
     const regex = new RegExp(pattern, 'i');
-    
+
     const walker = document.createTreeWalker(
       document.body,
       NodeFilter.SHOW_TEXT,
       { acceptNode: node => node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP }
     );
-    
+
     const matchingNodes = [];
     while (walker.nextNode()) {
       const node = walker.currentNode;
@@ -1854,41 +1854,41 @@ function getElementByRegexContent(pattern) {
         matchingNodes.push(node);
       }
     }
-    
+
     for (const node of matchingNodes) {
       let parent = node.parentNode;
       let depth = 0;
       const MAX_DEPTH = 3;
-      
+
       while (parent && depth < MAX_DEPTH) {
         if (isTargetable(parent)) {
           return parent;
         }
-        
+
         const input = parent.querySelector('input, select, textarea');
         if (input && isTargetable(input)) {
           return input;
         }
-        
+
         let sibling = parent.nextElementSibling;
         while (sibling) {
           if (isTargetable(sibling)) {
             return sibling;
           }
-          
+
           const siblingInput = sibling.querySelector('input, select, textarea');
           if (siblingInput && isTargetable(siblingInput)) {
             return siblingInput;
           }
-          
+
           sibling = sibling.nextElementSibling;
         }
-        
+
         parent = parent.parentNode;
         depth++;
       }
     }
-    
+
     return null;
   } catch (error) {
     console.error("Error in regex content matching:", error);
@@ -1909,55 +1909,55 @@ function getElementByContainsText(text) {
       }
     }
   );
-  
+
   const matchingNodes = [];
   while (walker.nextNode()) {
     matchingNodes.push(walker.currentNode);
   }
-  
+
   for (const node of matchingNodes) {
     let parent = node.parentNode;
     const MAX_DEPTH = 5;
     let depth = 0;
-    
+
     while (parent && depth < MAX_DEPTH) {
       if (isTargetable(parent)) {
         return parent;
       }
-      
+
       const input = parent.querySelector('input, select, textarea');
       if (input && isTargetable(input)) {
         return input;
       }
-      
+
       let sibling = parent.nextElementSibling;
       let siblingCount = 0;
       while (sibling && siblingCount < 3) {
         if (isTargetable(sibling)) {
           return sibling;
         }
-        
+
         const siblingInput = sibling.querySelector('input, select, textarea');
         if (siblingInput && isTargetable(siblingInput)) {
           return siblingInput;
         }
-        
+
         sibling = sibling.nextElementSibling;
         siblingCount++;
       }
-      
+
       parent = parent.parentNode;
       depth++;
     }
   }
-  
+
   return null;
 }
 
 // Enhanced pattern learning and suggestion system
 const PatternLearningSystem = {
   patterns: new Map(),
-  
+
   // Learn from successful patterns
   learnPattern: function(pattern, selectorType, context) {
     const key = `${selectorType}:${pattern}`;
@@ -1972,7 +1972,7 @@ const PatternLearningSystem = {
         confidence: 0
       });
     }
-    
+
     const patternData = this.patterns.get(key);
     patternData.successCount++;
     patternData.domains.add(context.domain);
@@ -1982,7 +1982,7 @@ const PatternLearningSystem = {
       timestamp: Date.now()
     });
     patternData.confidence = patternData.successCount / (patternData.successCount + patternData.failureCount);
-    
+
     // Store in chrome storage for persistence
     chrome.storage.local.get('learnedPatterns', (data) => {
       const learnedPatterns = data.learnedPatterns || {};
@@ -1993,11 +1993,11 @@ const PatternLearningSystem = {
       chrome.storage.local.set({ learnedPatterns });
     });
   },
-  
+
   // Get suggestions based on learned patterns
   getSuggestions: function(label, elementType) {
     const suggestions = [];
-    
+
     for (const [key, patternData] of this.patterns.entries()) {
       if (patternData.confidence > 0.7 && patternData.domains.size > 1) {
         const similarity = this.calculateSimilarity(label, patternData.contexts);
@@ -2014,20 +2014,20 @@ const PatternLearningSystem = {
         }
       }
     }
-    
+
     return suggestions.sort((a, b) => b.confidence - a.confidence);
   },
-  
+
   calculateSimilarity: function(text, contexts) {
     if (!contexts.length) return 0;
-    
+
     const similarities = contexts.map(ctx => {
       const words1 = text.toLowerCase().split(/\s+/);
       const words2 = ctx.label.toLowerCase().split(/\s+/);
       const intersection = words1.filter(word => words2.includes(word));
       return intersection.length / Math.max(words1.length, words2.length);
     });
-    
+
     return Math.max(...similarities);
   }
 };
@@ -2046,7 +2046,7 @@ chrome.storage.local.get('learnedPatterns', (data) => {
 // Generate intelligent selector suggestion with enhanced pattern learning
 function generateSelectorSuggestion(element, allSelectors) {
   const suggestions = [];
-  
+
   // Analyze element properties
   const label = getElementLabel(element);
   const placeholder = element.placeholder || '';
@@ -2055,14 +2055,14 @@ function generateSelectorSuggestion(element, allSelectors) {
   const className = element.className || '';
   const type = element.type || '';
   const domain = window.location.hostname;
-  
+
   // Check surrounding content for patterns
   const surroundingText = getSurroundingText(element);
-  
+
   // Get learned pattern suggestions first
   const learnedSuggestions = PatternLearningSystem.getSuggestions(label || placeholder || surroundingText, type);
   suggestions.push(...learnedSuggestions);
-  
+
   // Priority 1: Regex Label (if good label exists)
   if (label && label.length > 3) {
     const labelPattern = createRegexPattern(label);
@@ -2082,7 +2082,7 @@ function generateSelectorSuggestion(element, allSelectors) {
       });
     }
   }
-  
+
   // Priority 2: Regex Content (for survey questions)
   if (surroundingText && surroundingText.length > 5) {
     const contentPattern = createRegexPattern(surroundingText);
@@ -2097,7 +2097,7 @@ function generateSelectorSuggestion(element, allSelectors) {
       });
     }
   }
-  
+
   // Priority 3: Regex Placeholder (if meaningful placeholder)
   if (placeholder && placeholder.length > 5 && !isGenericPlaceholder(placeholder)) {
     const placeholderPattern = createRegexPattern(placeholder);
@@ -2112,7 +2112,7 @@ function generateSelectorSuggestion(element, allSelectors) {
       });
     }
   }
-  
+
   // Priority 4: Regex ID (if ID has meaningful pattern)
   if (id && id.length > 3 && hasPattern(id)) {
     const idPattern = extractIdPattern(id);
@@ -2127,7 +2127,7 @@ function generateSelectorSuggestion(element, allSelectors) {
       });
     }
   }
-  
+
   // Priority 5: Regex Name (if name has pattern)
   if (name && name.length > 3 && hasPattern(name)) {
     const namePattern = extractNamePattern(name);
@@ -2142,11 +2142,11 @@ function generateSelectorSuggestion(element, allSelectors) {
       });
     }
   }
-  
+
   // Fallback: Best non-regex selector with explanation why regex wasn't chosen
   let fallbackSelector = null;
   let fallbackReason = '';
-  
+
   if (id) {
     fallbackSelector = { type: 'id', value: id };
     fallbackReason = `ID selector chosen as fallback. Note: IDs are brittle and won't work across different survey instances. `;
@@ -2160,7 +2160,7 @@ function generateSelectorSuggestion(element, allSelectors) {
       fallbackReason = `CSS selector chosen as fallback. Note: CSS selectors are very brittle and specific to current page structure. `;
     }
   }
-  
+
   if (suggestions.length === 0 && fallbackSelector) {
     suggestions.push({
       type: fallbackSelector.type,
@@ -2171,13 +2171,13 @@ function generateSelectorSuggestion(element, allSelectors) {
       multiDomainPotential: 'none'
     });
   }
-  
+
   // Sort by confidence
   suggestions.sort((a, b) => b.confidence - a.confidence);
-  
+
   const recommendedSelector = suggestions[0];
   const alternatives = suggestions.slice(1, 3); // Top 2 alternatives
-  
+
   return {
     recommendedSelector,
     alternatives,
@@ -2194,13 +2194,13 @@ function generateSelectorSuggestion(element, allSelectors) {
 // Helper functions for suggestion generation
 function createRegexPattern(text) {
   if (!text || text.length < 3) return null;
-  
+
   // Clean the text and create a flexible regex pattern
   const cleanText = text.trim()
     .replace(/[.*+?^${}()|[\]\\]/g, '\\$&') // Escape regex special chars
     .replace(/\s+/g, '\\s*') // Allow flexible whitespace
     .replace(/\d+/g, '\\d+'); // Make numbers flexible
-  
+
   // Add word boundaries for better matching
   return `\\b${cleanText}\\b`;
 }
@@ -2241,7 +2241,7 @@ function getSurroundingText(element) {
   let current = element.parentElement;
   let depth = 0;
   const maxDepth = 3;
-  
+
   while (current && depth < maxDepth) {
     const text = current.textContent;
     if (text && text.length > 10 && text.length < 200) {
@@ -2258,7 +2258,7 @@ function getSurroundingText(element) {
     current = current.parentElement;
     depth++;
   }
-  
+
   return '';
 }
 
@@ -2271,21 +2271,21 @@ const RegexValidator = {
     /(.+)*/, // Nested quantifiers
     /(.*){10,}/, // High repetition
   ],
-  
+
   // Performance limits
   maxPatternLength: 200,
   maxTestElements: 1000,
   testTimeout: 5000,
-  
+
   validate: function(pattern) {
     const errors = [];
     const warnings = [];
-    
+
     // Check pattern length
     if (pattern.length > this.maxPatternLength) {
       errors.push(`Pattern too long (max ${this.maxPatternLength} characters)`);
     }
-    
+
     // Check for dangerous patterns
     for (const dangerous of this.dangerousPatterns) {
       if (dangerous.test(pattern)) {
@@ -2293,23 +2293,23 @@ const RegexValidator = {
         break;
       }
     }
-    
+
     // Test pattern compilation
     try {
       new RegExp(pattern, 'i');
     } catch (e) {
       errors.push(`Invalid regex: ${e.message}`);
     }
-    
+
     // Check complexity
     const complexity = this.calculateComplexity(pattern);
     if (complexity > 50) {
       warnings.push('Pattern is complex and may be slow');
     }
-    
+
     return { errors, warnings, complexity };
   },
-  
+
   calculateComplexity: function(pattern) {
     let score = 0;
     score += (pattern.match(/[+*?{]/g) || []).length * 5; // Quantifiers
@@ -2333,25 +2333,25 @@ function getCachedRegex(pattern, flags = 'i') {
 // Test regex pattern with safety and performance guards
 function testRegexPattern(pattern, selectorType) {
   const matches = [];
-  
+
   // Validate pattern first
   const validation = RegexValidator.validate(pattern);
   if (validation.errors.length > 0) {
     console.error('Regex validation failed:', validation.errors);
     return { error: validation.errors.join(', '), matches: [] };
   }
-  
+
   try {
     const regex = getCachedRegex(pattern, 'i');
     const startTime = Date.now();
-    
+
     // Set up timeout for safety
     const timeoutId = setTimeout(() => {
       throw new Error('Regex test timed out');
     }, RegexValidator.testTimeout);
-    
+
     let elementCount = 0;
-    
+
     switch (selectorType) {
       case 'regex-label':
         // Find all labels that match with performance limiting
@@ -2359,11 +2359,11 @@ function testRegexPattern(pattern, selectorType) {
         labels.forEach(label => {
           elementCount++;
           if (elementCount > RegexValidator.maxTestElements) return;
-          
+
           if (Date.now() - startTime > RegexValidator.testTimeout) {
             throw new Error('Regex test timed out');
           }
-          
+
           if (regex.test(label.textContent.trim())) {
             let element = null;
             if (label.htmlFor) {
@@ -2371,7 +2371,7 @@ function testRegexPattern(pattern, selectorType) {
             } else {
               element = label.querySelector('input:not([type="hidden"]), select, textarea');
             }
-            
+
             if (element && isTargetable(element)) {
               matches.push({
                 label: label.textContent.trim(),
@@ -2382,7 +2382,7 @@ function testRegexPattern(pattern, selectorType) {
             }
           }
         });
-        
+
         // Also check aria-labels
         const ariaElements = Array.from(document.querySelectorAll('[aria-label]'));
         ariaElements.forEach(element => {
@@ -2395,7 +2395,7 @@ function testRegexPattern(pattern, selectorType) {
           }
         });
         break;
-        
+
       case 'regex-id':
         const idElements = Array.from(document.querySelectorAll('[id]'));
         idElements.forEach(element => {
@@ -2408,7 +2408,7 @@ function testRegexPattern(pattern, selectorType) {
           }
         });
         break;
-        
+
       case 'regex-name':
         const nameElements = Array.from(document.querySelectorAll('[name]'));
         nameElements.forEach(element => {
@@ -2421,7 +2421,7 @@ function testRegexPattern(pattern, selectorType) {
           }
         });
         break;
-        
+
       case 'regex-placeholder':
         const placeholderElements = Array.from(document.querySelectorAll('[placeholder]'));
         placeholderElements.forEach(element => {
@@ -2434,7 +2434,7 @@ function testRegexPattern(pattern, selectorType) {
           }
         });
         break;
-        
+
       case 'regex-class':
         const classElements = Array.from(document.querySelectorAll('[class]'));
         classElements.forEach(element => {
@@ -2447,7 +2447,7 @@ function testRegexPattern(pattern, selectorType) {
           }
         });
         break;
-        
+
       case 'regex-value':
         const valueElements = Array.from(document.querySelectorAll('input, select, textarea'));
         valueElements.forEach(element => {
@@ -2461,7 +2461,7 @@ function testRegexPattern(pattern, selectorType) {
           }
         });
         break;
-        
+
       case 'regex-content':
         // This is more complex - find text nodes that match and nearby form elements
         const formElements = Array.from(document.querySelectorAll('input:not([type="hidden"]), select, textarea'));
@@ -2477,7 +2477,7 @@ function testRegexPattern(pattern, selectorType) {
           }
         });
         break;
-        
+
       case 'regex-attr':
         // Pattern should be in format: attributeName=regexPattern
         if (pattern.includes('=')) {
@@ -2499,10 +2499,10 @@ function testRegexPattern(pattern, selectorType) {
         }
         break;
     }
-    
+
     // Clear timeout and clean up
     clearTimeout(timeoutId);
-    
+
     // Remove duplicates
     const uniqueMatches = [];
     const seen = new Set();
@@ -2513,12 +2513,12 @@ function testRegexPattern(pattern, selectorType) {
         uniqueMatches.push(match);
       }
     });
-    
+
     const result = uniqueMatches.slice(0, 20); // Limit to 20 matches for performance
-    
+
     // Log performance metrics
     console.log(`Regex test completed: ${result.length} matches, ${elementCount} elements tested, ${Date.now() - startTime}ms`);
-    
+
     return result;
   } catch (error) {
     clearTimeout(timeoutId);
@@ -2533,7 +2533,7 @@ function highlightRegexMatches(pattern, selectorType) {
   document.querySelectorAll('.autofill-regex-highlight').forEach(el => {
     el.classList.remove('autofill-regex-highlight');
   });
-  
+
   // Add style if not already present
   if (!document.getElementById('autofill-regex-highlight-style')) {
     const style = document.createElement('style');
@@ -2553,18 +2553,18 @@ function highlightRegexMatches(pattern, selectorType) {
     `;
     document.head.appendChild(style);
   }
-  
+
   // Find and highlight matching elements
   const field = {
     selector: pattern,
     selectorType: selectorType
   };
-  
+
   const element = findElementBySelector(field);
   if (element) {
     element.classList.add('autofill-regex-highlight');
     element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    
+
     // Remove highlight after 5 seconds
     setTimeout(() => {
       element.classList.remove('autofill-regex-highlight');
@@ -2580,9 +2580,9 @@ function detectSurveyInIframes() {
     surveysDetected: [],
     fieldCounts: []
   };
-  
+
   console.log(`Found ${iframes.length} iframes on page`);
-  
+
   for (let i = 0; i < iframes.length; i++) {
     const iframe = iframes[i];
     let iframeData = {
@@ -2594,29 +2594,29 @@ function detectSurveyInIframes() {
       fieldCount: 0,
       surveyIndicators: []
     };
-    
+
     try {
       // Try to access iframe content (will fail for cross-origin)
       const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-      
+
       if (iframeDoc) {
         iframeData.accessible = true;
-        
+
         // Count form fields in iframe
         const fields = iframeDoc.querySelectorAll('input, select, textarea');
         iframeData.fieldCount = fields.length;
-        
+
         // Look for survey indicators in iframe
         const bodyText = iframeDoc.body ? iframeDoc.body.textContent.toLowerCase() : '';
         const titleText = iframeDoc.title ? iframeDoc.title.toLowerCase() : '';
-        
+
         const surveyKeywords = ['survey', 'questionnaire', 'feedback', 'form', 'research', 'study', 'interview'];
         surveyKeywords.forEach(keyword => {
           if (bodyText.includes(keyword) || titleText.includes(keyword)) {
             iframeData.surveyIndicators.push(keyword);
           }
         });
-        
+
         // Check iframe URL for survey patterns
         const srcUrl = iframe.src || '';
         if (srcUrl) {
@@ -2624,7 +2624,7 @@ function detectSurveyInIframes() {
             iframeData.surveyIndicators.push('url_pattern');
           }
         }
-        
+
         console.log(`Iframe ${i}: ${iframeData.fieldCount} fields, indicators: ${iframeData.surveyIndicators.join(', ')}`);
       } else {
         console.log(`Iframe ${i}: Not accessible (cross-origin)`);
@@ -2632,7 +2632,7 @@ function detectSurveyInIframes() {
     } catch (error) {
       console.log(`Iframe ${i}: Cannot access due to cross-origin policy`);
       iframeData.accessible = false;
-      
+
       // Still check the iframe src for survey indicators
       const srcUrl = iframe.src || '';
       if (srcUrl) {
@@ -2641,11 +2641,11 @@ function detectSurveyInIframes() {
         }
       }
     }
-    
+
     surveyData.surveysDetected.push(iframeData);
     surveyData.fieldCounts.push(iframeData.fieldCount);
   }
-  
+
   return surveyData;
 }
 
