@@ -195,7 +195,13 @@ function fillAllFields() {
             if (response && response.status === 'success') {
               const results = response.result || [];
               const successCount = results.filter(r => r.status === 'success').length;
-              showNotification(`Filled ${successCount} out of ${fields.length} fields!`, 'success');
+              if (options.notifyOnAutofill !== false && successCount > 0) {
+                let message = `Auto-filled ${successCount} field${successCount !== 1 ? 's' : ''}!`;
+                if (includeIframes) {
+                  message += ` [including iframes]`;
+                }
+                showNotification(message, 'success');
+              }
             } else {
               showNotification('Error filling fields', 'error');
             }
