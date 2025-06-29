@@ -1776,7 +1776,6 @@ function showEnhancedSurveyModal() {
           <div id="ongoing-surveys-list" style="max-height: 300px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 5px; margin-bottom: 15px;">
             <div style="text-align: center; padding: 20px; color: #666;">Loading ongoing surveys...</div>
           </div>
-```
         </div>
 
         <div class="modal-footer">
@@ -2691,7 +2690,7 @@ function getFieldTitle(field) {
 // Truncate text if too long
 function truncateText(text, maxLength) {
   if (!text) return '';
-  return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+  return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
 }
 
 // ENHANCED: Add a new field with pattern learning and validation

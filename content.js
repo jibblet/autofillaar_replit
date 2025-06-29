@@ -282,49 +282,6 @@ const NotificationManager = {
 function showNotification(message, type = 'success', duration = 3000) {
   NotificationManager.show(message, type, duration);
 }
-  const notification = document.createElement('div');
-  notification.textContent = message;
-  notification.style.cssText = `
-    position: fixed !important;
-    bottom: 20px !important;
-    right: 20px !important;
-    padding: 10px 15px !important;
-    border-radius: 5px !important;
-    color: white !important;
-    font-size: 14px !important;
-    z-index: 9999 !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-    max-width: 300px !important;
-    word-wrap: break-word !important;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-  `;
-
-  switch (type) {
-    case 'success':
-      notification.style.backgroundColor = '#34a853';
-      break;
-    case 'error':
-      notification.style.backgroundColor = '#ea4335';
-      break;
-    case 'warning':
-      notification.style.backgroundColor = '#fbbc05';
-      notification.style.color = '#333';
-      break;
-    case 'info':
-      notification.style.backgroundColor = '#4285f4';
-      break;
-    default:
-      notification.style.backgroundColor = '#4285f4';
-  }
-
-  document.body.appendChild(notification);
-
-  setTimeout(function() {
-    if (document.body.contains(notification)) {
-      document.body.removeChild(notification);
-    }
-  }, duration);
-}
 
 // Fixed and simplified survey autofilled notification
 function showSurveyAutofilledNotification(surveyData) {
@@ -749,88 +706,6 @@ const FieldManager = {
 // Enhanced field filling with conflict prevention
 function fillFields(fields) {
   return FieldManager.fill(fields);
-}
-  if (!fields || !Array.isArray(fields)) {
-    console.error("Invalid fields parameter:", fields);
-    return Promise.resolve([]);
-  }
-
-  // Filter valid fields
-  const validFields = fields.filter(field => {
-    if (!isValidFieldObject(field)) {
-      console.warn("Skipping invalid field:", field);
-      return false;
-    }
-    return true;
-  });
-
-  const promises = validFields.map(field => {
-    return new Promise((resolve) => {
-      try {
-        const element = findElementBySelector(field);
-
-        if (element && isSafeToFill(element) && isElementVisible(element)) {
-          // Check for conflicts before filling
-          if (AutofillExtension.isFieldManagedByOther(element)) {
-            console.log('Skipping field managed by other password manager:', element);
-            resolve({
-              id: field.id || 'unknown',
-              status: 'skipped',
-              message: 'Field managed by another password manager',
-              selector: field.selector,
-              selectorType: field.selectorType
-            });
-            return;
-          }
-
-          // Check if we already manage this field
-          if (AutofillExtension.isOurField(element)) {
-            console.log('Field already managed by our extension, proceeding');
-          }
-
-          // Mark as ours and fill
-          AutofillExtension.markFieldAsOurs(element);
-          const success = fillElement(element, field.value);
-
-          if (success) {
-            resolve({
-              id: field.id || 'unknown',
-              status: 'success',
-              selector: field.selector,
-              selectorType: field.selectorType
-            });
-          } else {
-            resolve({
-              id: field.id || 'unknown',
-              status: 'error',
-              message: 'Could not fill element',
-              selector: field.selector,
-              selectorType: field.selectorType
-            });
-          }
-        } else {
-          resolve({
-            id: field.id || 'unknown',
-            status: 'error',
-            message: 'Element not found, not safe, or not visible',
-            selector: field.selector,
-            selectorType: field.selectorType
-          });
-        }
-      } catch (error) {
-        console.error("Error filling field:", field, error);
-        resolve({
-          id: field.id || 'unknown',
-          status: 'error',
-          message: error.message,
-          selector: field.selector,
-          selectorType: field.selectorType
-        });
-      }
-    });
-  });
-
-  return Promise.all(promises);
 }
 
 // Enhanced safety check that avoids password fields and respects other managers
