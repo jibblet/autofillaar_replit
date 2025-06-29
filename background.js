@@ -854,7 +854,8 @@ async function handleKnownSurvey(tabId, duplicateDetails) {
       chrome.scripting.executeScript({
         target: {tabId: tabId},
         func: (msg) => { alert(msg); },
-        args: [message]
+        args:```python
+[message]
       });
     }
   }, 500);
@@ -1643,6 +1644,7 @@ function extractSurveyId(url, title) {
       }
     } else if (url.includes('surveymonkey.com')) {
       const rIndex = pathParts.indexOf('r');
+```python
       if (rIndex !== -1 && pathParts[rIndex + 1]) {
         const id = pathParts[rIndex + 1];
         console.log('SurveyMonkey ID extracted:', id);
@@ -2326,86 +2328,67 @@ chrome.tabs.onRemoved.addListener(function(tabId) {
   }
 });
 
-// Export data to a consistent location (Downloads/RoboFormSettings/)
+// Export data to downloads folder (Chrome extension limitation workaround)
 async function exportDataToWorkingDir(data) {
   try {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `RoboFormSettings/autofill-settings-${timestamp}.json`;
+    // Validate and clean the data before export
+    const cleanData = {
+      fields: (data.fields || []).filter(field => field.selector && field.selectorType),
+      domains: (data.domains || []).filter(domain => domain.domain),
+      options: data.options || {},
+      autoFillLogs: data.autoFillLogs || [],
+      completedSurveys: data.completedSurveys || [],
+      inProgressSurveys: data.inProgressSurveys || [],
+      version: data.version || '1.1',
+      exportDate: new Date().toISOString(),
+      exportSource: 'background_script'
+    };
 
-    // Create the JSON content
-    const jsonContent = JSON.stringify(data, null, 2);
+    const jsonString = JSON.stringify(cleanData, null, 2);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = `autofill-working-export-${timestamp}.json`;
 
-    // Use chrome.downloads API to save to Downloads/RoboFormSettings/ folder
-    const blob = new Blob([jsonContent], { type: 'application/json' });
+    // Use Chrome downloads API
+    const blob = new Blob([jsonString], {type: 'application/json'});
     const url = URL.createObjectURL(blob);
 
-    return new Promise((resolve, reject) => {
-      chrome.downloads.download({
-        url: url,
-        filename: fileName,
-        saveAs: false, // Auto-save to downloads/RoboFormSettings/
-        conflictAction: 'overwrite'
-      }, (downloadId) => {
-        URL.revokeObjectURL(url);
-
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          console.log('✅ Settings exported to Downloads/' + fileName);
-          resolve({
-            status: 'success',
-            filePath: 'Downloads/' + fileName,
-            downloadId: downloadId
-          });
-        }
-      });
+    const downloadId = await chrome.downloads.download({
+      url: url,
+      filename: filename,
+      saveAs: false
     });
+
+    // Clean up the blob URL after download starts
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    return {
+      status: 'success',
+      message: `Data exported to downloads folder`,
+      filePath: filename,
+      downloadId: downloadId
+    };
   } catch (error) {
-    console.error('Export error:', error);
-    throw error;
+    console.error('Export to working dir error:', error);
+    return {status: 'error', message: error.message};
   }
 }
 
-// Import data from the consistent location (Downloads/RoboFormSettings/)
+// Import data from working directory (user must still select file manually)
 async function importDataFromWorkingDir() {
   try {
-    // Look for export files in the RoboFormSettings folder
-    return new Promise((resolve, reject) => {
-      chrome.downloads.search({
-        filenameRegex: 'RoboFormSettings/autofill-settings.*\\.json',
-        orderBy: ['-startTime'],
-        limit: 5 // Get the 5 most recent files
-      }, async (items) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
+    // Due to Chrome security restrictions, we cannot read files directly
+    // Return information about where the export would be
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const expectedFilename = `autofill-working-export-${timestamp}.json`;
 
-        if (!items || items.length === 0) {
-          reject(new Error('No exported settings found in Downloads/RoboFormSettings/'));
-          return;
-        }
-
-        // Get the most recent successful download
-        const latestFile = items[0];
-        if (!latestFile.exists || latestFile.state !== 'complete') {
-          reject(new Error('Latest settings file is not accessible'));
-          return;
-        }
-
-        // Return file info for manual processing
-        resolve({
-          status: 'found',
-          message: `Latest settings file found: ${latestFile.filename}`,
-          filePath: latestFile.filename,
-          downloadId: latestFile.id,
-          fileExists: latestFile.exists
-        });
-      });
-    });
+    return {
+      status: 'found',
+      message: 'Export files are saved to Downloads folder. Please use manual import to select the file.',
+      filePath: `Downloads/autofill-working-export-*.json`,
+      instruction: 'Look for files starting with "autofill-working-export-" in your Downloads folder'
+    };
   } catch (error) {
-    console.error('Import error:', error);
-    throw error;
+    return {status: 'error', message: error.message};
   }
 }
 

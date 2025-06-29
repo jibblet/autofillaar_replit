@@ -1297,29 +1297,86 @@ function saveSettings() {
   });
 }
 
-// Export all data including usage logs
+// Export all data with complete field mappings and validation
 function exportAllData() {
-  chrome.storage.local.get(['fields', 'domains', 'options', 'autoFillLogs', 'completedSurveys'], function(data) {
+  chrome.storage.local.get(['fields', 'domains', 'options', 'autoFillLogs', 'completedSurveys', 'inProgressSurveys', 'learnedPatterns'], function(data) {
+    // Validate and clean data before export
+    const fields = (data.fields || []).map(field => {
+      // Ensure all required properties are present
+      const cleanField = {
+        id: field.id || 'field_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+        selector: field.selector || '',
+        selectorType: field.selectorType || 'css',
+        value: field.value !== undefined ? field.value : '',
+        label: field.label || ''
+      };
+
+      // Preserve additional properties if they exist
+      if (field.allSelectors) cleanField.allSelectors = field.allSelectors;
+      if (field.suggestion) cleanField.suggestion = field.suggestion;
+      if (field.confidence) cleanField.confidence = field.confidence;
+      if (field.sourceDomain) cleanField.sourceDomain = field.sourceDomain;
+      if (field.domainRestricted !== undefined) cleanField.domainRestricted = field.domainRestricted;
+      if (field.usageCount) cleanField.usageCount = field.usageCount;
+      if (field.lastUsed) cleanField.lastUsed = field.lastUsed;
+      if (field.performance) cleanField.performance = field.performance;
+
+      return cleanField;
+    });
+
+    const domains = (data.domains || []).map(domain => {
+      return {
+        domain: domain.domain || '',
+        enabled: domain.enabled !== undefined ? domain.enabled : true,
+        fillAllFields: domain.fillAllFields !== undefined ? domain.fillAllFields : true,
+        delay: domain.delay || 1000,
+        specificFields: domain.specificFields || []
+      };
+    });
+
     const exportData = {
-      fields: data.fields || [],
-      domains: data.domains || [],
+      // Core data
+      fields: fields,
+      domains: domains,
       options: data.options || {},
-      autoFillLogs: data.autoFillLogs || [], // Include usage logs!
+      
+      // Usage and tracking data
+      autoFillLogs: data.autoFillLogs || [],
       completedSurveys: data.completedSurveys || [],
-      version: '1.0',
-      exportDate: new Date().toISOString()
+      inProgressSurveys: data.inProgressSurveys || [],
+      learnedPatterns: data.learnedPatterns || {},
+      
+      // Metadata
+      version: '1.1',
+      exportDate: new Date().toISOString(),
+      exportType: 'complete',
+      fieldCount: fields.length,
+      domainCount: domains.length
     };
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
-    const url = URL.createObjectURL(blob);
+    try {
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonString], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
 
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'autofill-export.json';
-    a.click();
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const filename = `autofill-complete-export-${timestamp}.json`;
 
-    setTimeout(() => URL.revokeObjectURL(url), 100);
-    showNotification('Data exported with usage statistics!');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      
+      showNotification(`Complete export saved: ${fields.length} fields, ${domains.length} domains, ${exportData.autoFillLogs.length} logs`, 'success');
+    } catch (error) {
+      console.error('Export error:', error);
+      showNotification('Error creating export file: ' + error.message, 'error');
+    }
   });
 }
 
@@ -1440,7 +1497,7 @@ function importSurveyHistory(event) {
   reader.readAsText(file);
 }
 
-// Enhanced import data function to handle survey data better
+// Enhanced import data function with proper field mapping validation
 function importData(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -1450,73 +1507,135 @@ function importData(event) {
     try {
       const data = JSON.parse(e.target.result);
 
-      // Check what type of data this file contains
+      // Validate data structure
       const hasFields = data.fields && Array.isArray(data.fields);
       const hasDomains = data.domains && Array.isArray(data.domains);
       const hasSurveyData = data.completedSurveys || data.inProgressSurveys;
       const hasLogs = data.autoFillLogs && Array.isArray(data.autoFillLogs);
+      const hasOptions = data.options && typeof data.options === 'object';
 
-      if (!hasFields && !hasDomains && !hasSurveyData && !hasLogs) {
+      if (!hasFields && !hasDomains && !hasSurveyData && !hasLogs && !hasOptions) {
         showNotification('Invalid data format - no recognizable data found!', 'error');
         return;
       }
 
-      // Show user what will be imported
-      let importSummary = 'This file contains:\n';
-      if (hasFields) importSummary += `• ${data.fields.length} fields\n`;
-      if (hasDomains) importSummary += `• ${data.domains.length} domains\n`;
+      // Validate field structure and fix any mapping issues
+      let validatedFields = [];
+      if (hasFields) {
+        validatedFields = data.fields.filter(field => {
+          // Ensure required properties exist
+          if (!field.selector || !field.selectorType || field.value === undefined) {
+            console.warn('Skipping invalid field:', field);
+            return false;
+          }
+          
+          // Ensure field has a unique ID
+          if (!field.id) {
+            field.id = 'field_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+          }
+          
+          // Validate selector type
+          const validTypes = ['id', 'name', 'css', 'xpath', 'label', 'placeholder', 'aria-label', 
+                            'data-attribute', 'regex-label', 'regex-id', 'regex-name', 'regex-class',
+                            'regex-placeholder', 'regex-content', 'regex-value', 'regex-attr'];
+          if (!validTypes.includes(field.selectorType)) {
+            console.warn('Invalid selector type, defaulting to css:', field.selectorType);
+            field.selectorType = 'css';
+          }
+
+          return true;
+        });
+      }
+
+      // Validate domain structure
+      let validatedDomains = [];
+      if (hasDomains) {
+        validatedDomains = data.domains.filter(domain => {
+          if (!domain.domain || typeof domain.domain !== 'string') {
+            console.warn('Skipping invalid domain:', domain);
+            return false;
+          }
+          
+          // Set defaults for missing properties
+          if (domain.enabled === undefined) domain.enabled = true;
+          if (domain.fillAllFields === undefined) domain.fillAllFields = true;
+          if (!domain.delay) domain.delay = 1000;
+          if (!domain.specificFields) domain.specificFields = [];
+
+          return true;
+        });
+      }
+
+      // Show user what will be imported with validation results
+      let importSummary = 'Import Summary:\n';
+      if (hasFields) {
+        importSummary += `• ${validatedFields.length} valid fields (${data.fields.length - validatedFields.length} invalid skipped)\n`;
+      }
+      if (hasDomains) {
+        importSummary += `• ${validatedDomains.length} valid domains (${data.domains.length - validatedDomains.length} invalid skipped)\n`;
+      }
       if (hasSurveyData) {
         const completedCount = data.completedSurveys?.length || 0;
         const inProgressCount = data.inProgressSurveys?.length || 0;
         importSummary += `• ${completedCount + inProgressCount} surveys (${completedCount} completed, ${inProgressCount} in-progress)\n`;
       }
       if (hasLogs) importSummary += `• ${data.autoFillLogs.length} usage logs\n`;
-      importSummary += '\nClick OK to import all data, or Cancel to abort.';
+      if (hasOptions) importSummary += `• Extension settings\n`;
+      importSummary += '\nProceed with import?';
 
       if (!confirm(importSummary)) {
         showNotification('Import cancelled', 'info');
         return;
       }
 
-      // Prepare data to import
-      const importData = {};
+      // Prepare validated data for import
+      const importPayload = {};
+      
+      if (validatedFields.length > 0) importPayload.fields = validatedFields;
+      if (validatedDomains.length > 0) importPayload.domains = validatedDomains;
+      if (hasOptions) importPayload.options = data.options;
+      if (hasLogs) importPayload.autoFillLogs = data.autoFillLogs;
+      if (data.completedSurveys) importPayload.completedSurveys = data.completedSurveys;
+      if (data.inProgressSurveys) importPayload.inProgressSurveys = data.inProgressSurveys;
 
-      if (hasFields) importData.fields = data.fields;
-      if (hasDomains) importData.domains = data.domains;
-      if (data.options) importData.options = data.options;
+      // Import with error handling
+      chrome.storage.local.set(importPayload, function() {
+        if (chrome.runtime.lastError) {
+          showNotification('Error saving imported data: ' + chrome.runtime.lastError.message, 'error');
+          return;
+        }
 
-      // Include logs if available (preserves usage statistics)
-      if (hasLogs) importData.autoFillLogs = data.autoFillLogs;
-
-      // Include survey data if available
-      if (data.completedSurveys) importData.completedSurveys = data.completedSurveys;
-      if (data.inProgressSurveys) importData.inProgressSurveys = data.inProgressSurveys;
-
-      chrome.storage.local.set(importData, function() {
         // Reload all relevant sections
-        if (hasFields || hasDomains) {
-          loadDomains();
-          loadFields();
-        }
-        if (data.options) loadSettings();
-        if (hasSurveyData) loadSurveyData();
-        if (hasLogs) loadLogs();
+        setTimeout(() => {
+          if (validatedFields.length > 0 || validatedDomains.length > 0) {
+            loadDomains();
+            loadFields();
+          }
+          if (hasOptions) loadSettings();
+          if (hasSurveyData) loadSurveyData();
+          if (hasLogs) loadLogs();
+        }, 100);
 
-        let message = 'Data imported successfully!';
-        if (hasLogs) {
-          message += ' Usage statistics preserved.';
-        }
-        if (hasSurveyData) {
-          message += ' Survey history included.';
-        }
-
+        let message = `Import successful! `;
+        if (validatedFields.length > 0) message += `${validatedFields.length} fields, `;
+        if (validatedDomains.length > 0) message += `${validatedDomains.length} domains, `;
+        if (hasLogs) message += 'usage statistics preserved, ';
+        if (hasSurveyData) message += 'survey history included, ';
+        
+        message = message.replace(/, $/, ''); // Remove trailing comma
         showNotification(message, 'success');
       });
+
     } catch (error) {
+      console.error('Import error:', error);
       showNotification('Error importing data: ' + error.message, 'error');
     }
 
     event.target.value = '';
+  };
+
+  reader.onerror = function() {
+    showNotification('Error reading file!', 'error');
   };
 
   reader.readAsText(file);
@@ -1760,6 +1879,32 @@ function getTimeAgo(timestamp) {
   }
 }
 
+// Test field mapping integrity
+function testFieldMappings() {
+  chrome.runtime.sendMessage({action: 'validateFieldMappings'}, function(response) {
+    if (response && response.isValid) {
+      showNotification(
+        `✅ Field mappings valid: ${response.fieldCount} fields, ${response.domainCount} domains`,
+        'success'
+      );
+    } else if (response) {
+      console.log('Field mapping issues found:', response.issues);
+      let issueText = `⚠️ Found ${response.issues.length} mapping issues:\n`;
+      response.issues.slice(0, 5).forEach(issue => {
+        issueText += `• ${issue.type}: ${issue.issue}\n`;
+      });
+      if (response.issues.length > 5) {
+        issueText += `• ... and ${response.issues.length - 5} more\n`;
+      }
+      issueText += '\nCheck console for details.';
+      alert(issueText);
+      showNotification('Field mapping issues detected', 'warning');
+    } else {
+      showNotification('Error validating field mappings', 'error');
+    }
+  });
+}
+
 // Set up event listeners
 function setupEventListeners() {
   // Search functionality with debounce
@@ -1994,6 +2139,12 @@ function setupEventListeners() {
   const resetAllBtn = document.getElementById('reset-all-data');
   if (resetAllBtn) {
     resetAllBtn.addEventListener('click', resetAllData);
+  }
+
+  // Test field mappings button
+  const testMappingsBtn = document.getElementById('test-field-mappings');
+  if (testMappingsBtn) {
+    testMappingsBtn.addEventListener('click', testFieldMappings);
   }
 
   // Add domain button
