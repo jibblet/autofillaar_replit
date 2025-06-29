@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Enhanced Autofill Extension</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      width: 350px;
+      padding: 15px;
+      margin: 0;
+    }
+
+    h1 {
+      color: #ea4335;
+      font-size: 18px;
+      margin-top: 0;
+      margin-bottom: 15px;
+      border-bottom: 1px solid #e0e0e0;
+      padding-bottom: 10px;
+    }
+
+    /* Add a new style for the top action buttons */
+    .top-actions {
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .top-actions button {
+      flex: 1;
+      margin-right: 5px;
+    }
+
+    .top-actions button:last-child {
+      margin-right: 0;
+    }
+
+    .field-form {
+      margin-bottom: 20px;
+      background-color: #f9f9f9;
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #e0e0e0;
+    }
+
+    .form-group {
+      margin-bottom: 10px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      font-size: 13px;
+    }
+
+    input[type="text"], select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+
+    /* CSS Selector Validation Styles */
+    .selector-input-container {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .selector-validation-indicator {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: none;
+      z-index: 10;
+    }
+
+    .selector-validation-indicator.valid {
+      background-color: #34a853;
+      display: block;
+    }
+
+    .selector-validation-indicator.invalid {
+      background-color: #ea4335;
+      display: block;
+    }
+
+    .selector-validation-indicator.checking {
+      background-color: #fbbc05;
+      display: block;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.05); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    .pulse-highlight {
+      animation: pulse 2s infinite;
+      border: 2px solid #4285f4 !important;
+      box-shadow: 0 0 10px rgba(66, 133, 244, 0.5) !important;
+    }
+
+    .selector-validation-tooltip {
+      position: absolute;
+      bottom: 100%;
+      right: 0;
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: nowrap;
+      z-index: 100;
+      margin-bottom: 5px;
+      display: none;
+      max-width: 250px;
+      word-wrap: break-word;
+      white-space: normal;
+    }
+
+    .selector-validation-tooltip.show {
+      display: block;
+    }
+
+    .selector-validation-tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      right: 10px;
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 5px solid rgba(0, 0, 0, 0.9);
+    }
+
+    .input-with-validation {
+      padding-right: 30px;
+    }
+
+    .regex-active {
+      border-color: #4285f4 !important;
+      background-color: #f0f8ff !important;
+    }
+
+    button {
+      background-color: #ea4335;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 14px;
+      margin: 4px 2px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    button:hover {
+      background-color: #d62516;
+    }
+
+    .btn-secondary {
+      background-color: #5f6368;
+    }
+
+    .btn-secondary:hover {
+      background-color: #4a4d51;
+    }
+
+    .btn-success {
+      background-color: #34a853;
+    }
+
+    .btn-success:hover {
+      background-color: #2d9249;
+    }
+
+    .btn-warning {
+      background-color: #fbbc05;
+      color: #333;
+      font-weight: bold;
+    }
+
+    .btn-warning:hover {
+      background-color: #f9ab00;
+      color: #333;
+    }
+
+    .fields-list {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 5px;
+    }
+
+    .field-item {
+      padding: 10px;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .field-item:last-child {
+      border-bottom: none;
+    }
+
+    .field-info {
+      flex: 1;
+    }
+
+    .field-title {
+      font-weight: bold;
+      font-size: 14px;
+      margin-bottom: 3px;
+    }
+
+    .field-selector, .field-value {
+      font-size: 12px;
+      color: #5f6368;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 250px;
+    }
+
+    .field-actions {
+      display: flex;
+      gap: 5px;
+    }
+
+    .field-actions button {
+      padding: 5px;
+      font-size: 12px;
+    }
+
+    .notification {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 10px 15px;
+      border-radius: 5px;
+      color: white;
+      font-size: 14px;
+      z-index: 100;
+      display: none;
+    }
+        .diagnostics-progress {
+      height: 20px;
+      background-color: #f1f1f1;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      position: relative;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background-color: #4285f4;
+      border-radius: 10px;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    #progress-text {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      text-align: center;
+      line-height: 20px;
+      color: #333;
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    .diagnostics-results {
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 10px;
+    }
+
+    .diagnostics-summary {
+      padding: 10px;
+      margin-bottom: 10px;
+      background-color: #f9f9f9;
+      border-radius: 5px;
+      border: 1px solid #e0e0e0;
+    }
+
+    .issues-summary {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    .high-severity {
+      color: #ea4335;
+      margin-right: 5px;
+    }
+
+    .medium-severity {
+      color: #fbbc05;
+      margin-right: 5px;
+    }
+
+    .low-severity {
+      color: #4285f4;
+      margin-right: 5px;
+    }
+
+    .field-issues-list {
+      margin-top: 15px;
+    }
+
+    .field-issue-item {
+      margin-bottom: 15px;
+      padding: 10px;
+      border: 1px solid #e0e0e0;
+      border-radius: 5px;
+      background-color: #fff;
+    }
+
+    .field-issue-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .field-issue-title {
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .field-issue-actions {
+      display: flex;
+      gap: 5px;
+    }
+
+    .field-issue-actions button {
+      padding: 3px 8px;
+      font-size: 12px;
+    }
+
+    .field-issue-details {
+      margin-bottom: 10px;
+      padding: 8px;
+      background-color: #f9f9f9;
+      border-radius: 3px;
+      font-size: 12px;
+    }
+
+    .field-info-row {
+      margin-bottom: 5px;
+    }
+
+    .field-info-label {
+      font-weight: bold;
+      display: inline-block;
+      width: 80px;
+    }
+
+    .field-issues {
+      margin-top: 10px;
+    }
+
+    .issue-item {
+      padding: 5px 10px;
+      margin-bottom: 5px;
+      border-left: 3px solid #ccc;
+      background-color: #f9f9f9;
+      font-size: 12px;
+    }
+
+    .issue-item.high-severity {
+      border-left-color: #ea4335;
+      background-color: rgba(234, 67, 53, 0.1);
+    }
+
+    .issue-item.medium-severity {
+      border-left-color: #fbbc05;
+      background-color: rgba(251, 188, 5, 0.1);
+    }
+
+    .issue-item.low-severity {
+      border-left-color: #4285f4;
+      background-color: rgba(66, 133, 244, 0.1);
+    }
+
+    .issue-message {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .issue-details {
+      margin-bottom: 5px;
+      font-style: italic;
+    }
+
+    .issue-fix {
+      font-size: 11px;
+      color: #5f6368;
+    }
+
+    .not-used {
+      color: #999;
+      font-style: italic;
+    }
+
+    .notification.success {
+      background-color: #34a853;
+    }
+
+    .notification.error {
+      background-color: #ea4335;
+    }
+
+    .notification.warning {
+      background-color: #fbbc05;
+      color: #333;
+    }
+
+    .notification.info {
+      background-color: #4285f4;
+    }
+
+    .selector-options {
+      margin-top: 10px;
+      border: 1px solid #e0e0e0;
+      border-radius: 5px;
+      padding: 10px;
+      display: none;
+      max-height: 200px;
+      overflow-y: auto;
+      background-color: white;
+    }
+
+    .selector-options-header {
+      font-weight: bold;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+
+    .selector-option {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px;
+      border-bottom: 1px solid #f1f1f1;
+    }
+
+    .selector-option:last-child {
+      border-bottom: none;
+    }
+
+    .selector-option-info {
+      flex: 1;
+    }
+
+    .selector-option-type {
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    .selector-option-value {
+      font-size: 11px;
+      color: #5f6368;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 250px;
+    }
+
+    .selector-option-description {
+      font-size: 10px;
+      color: #9aa0a6;
+      margin-top: 2px;
+    }
+
+    .use-selector-btn {
+      padding: 3px 5px;
+      font-size: 11px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .regex-tester {
+      margin-top: 15px;
+      padding: 10px;
+      background-color: #f5f5f5;
+      border: 1px solid #e0e0e0;
+      border-radius: 5px;
+      display: none;
+    }
+
+    .regex-result {
+      margin-top: 10px;
+      padding: 8px;
+      background-color: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 3px;
+      min-height: 24px;
+    }
+
+    .match {
+      color: #34a853;
+      font-weight: bold;
+    }
+
+    .no-match {
+      color: #ea4335;
+    }
+
+    .regex-highlight {
+      background-color: rgba(66, 133, 244, 0.2);
+      font-weight: bold;
+    }
+
+    /* Add a toggle icon for the regex tester */
+    .regex-toggle {
+      display: inline-block;
+      margin-left: 10px;
+      color: #5f6368;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 3px 6px;
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+
+    .regex-toggle:hover {
+      background: #e0e0e0;
+    }
+
+    /* Modal dialogs */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-content {
+      background-color: white;
+      margin: 10% auto;
+      padding: 20px;
+      border-radius: 5px;
+      width: 80%;
+      max-width: 500px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin: 0;
+    }
+
+    .close {
+      color: #aaa;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .close:hover {
+      color: #333;
+    }
+
+
+    .selector-suggestions {
+      background-color: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      margin-top: 5px;
+      max-height: 200px;
+      overflow-y: auto;
+      position: absolute;
+      width: calc(100% - 20px);
+      z-index: 1000;
+    }
+
+    .suggestions-header {
+      background-color: #f5f5f5;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 12px;
+      font-weight: bold;
+      padding: 6px 10px;
+    }
+
+    .suggestion-item {
+      border-bottom: 1px solid #f0f0f0;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 10px;
+    }
+
+    .suggestion-item:last-child {
+      border-bottom: none;
+    }
+
+    .suggestion-item:hover {
+      background-color: #f5f5f5;
+    }
+
+    .suggestion-item.current-type {
+      background-color: rgba(66, 133, 244, 0.05);
+      border-left: 3px solid #4285f4;
+    }
+
+    .suggestion-info {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .suggestion-selector {
+      font-weight: bold;
+      margin-bottom: 3px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .suggestion-meta {
+      color: #5f6368;
+      font-size: 11px;
+    }
+
+    .suggestion-type, .suggestion-label, .suggestion-value {
+      display: inline-block;
+      margin-right: 5px;
+    }
+
+    .suggestion-type {
+      color: #4285f4;
+    }
+
+    .use-suggestion-btn {
+      background-color: #4285f4;
+      border: none;
+      border-radius: 3px;
+      color: white;
+      cursor: pointer;
+      font-size: 11px;
+      margin-left: 8px;
+      padding: 4px 8px;
+    }
+
+    .use-suggestion-btn:hover {
+      background-color: #357ae8;
+    }
+
+    .show-all-suggestions {
+      background-color: #f5f5f5;
+      border-top: 1px solid #e0e0e0;
+      color: #5f6368;
+      font-size: 11px;
+      padding: 5px 10px;
+      text-align: center;
+    }
+
+    .modal-footer {
+      padding-top: 15px;
+      margin-top: 20px;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .detected-fields-list {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 5px;
+      padding: 10px;
+      margin-bottom: 15px;
+    }
+
+    .detected-field-item {
+      padding: 8px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .detected-field-item:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+
+    .detected-field-info {
+      display: flex;
+      align-items: center;
+    }
+
+    .detected-field-checkbox {
+      margin-right: 10px;
+    }
+
+    .detected-field-details {
+      flex: 1;
+    }
+
+    .detected-field-label {
+      font-weight: bold;
+      margin-bottom: 3px;
+    }
+
+    .detected-field-selector {
+      font-size: 12px;
+      color: #5f6368;
+    }
+
+    .detected-field-value {
+      font-size: 12px;
+      color: #34a853;
+      margin-top: 3px;
+    }
+
+    .domain-restriction-info {
+      background: linear-gradient(135deg, #fff3e0 0%, #ffecb3 100%);
+      border: 1px solid #ffb74d;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
+
+    .restriction-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+
+    .restriction-icon {
+      font-size: 16px;
+      margin-right: 8px;
+    }
+
+    .restriction-text {
+      flex: 1;
+      color: #e65100;
+      font-weight: 500;
+    }
+
+    .remove-restriction-btn {
+      background: none;
+      border: none;
+      color: #e65100;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      padding: 2px 6px;
+      border-radius: 3px;
+      transition: background-color 0.2s;
+    }
+
+    .remove-restriction-btn:hover {
+      background-color: rgba(230, 81, 0, 0.1);
+    }
+
+    .restriction-note {
+      font-size: 11px;
+      color: #bf360c;
+      font-style: italic;
+    }
+
+    .selector-options-badge {
+      background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
+      color: white;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: bold;
+      margin-left: 8px;
+      animation: pulse-badge 2s infinite;
+      cursor: pointer;
+    }
+
+    .selector-options-badge:hover {
+      transform: scale(1.05);
+    }
+
+    @keyframes pulse-badge {
+      0% { opacity: 1; }
+      50% { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+
+    /* Survey tracking button styles */
+    .survey-section {
+      margin-bottom: 15px;
+      padding: 12px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 8px;
+      color: white;
+    }
+
+    .survey-section h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .survey-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .survey-actions button {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    .survey-actions button:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <h1>Enhanced Field Autofill</h1>
+
+  <!-- Top actions section with Fill All Fields moved to the top -->
+  <div class="top-actions">
+    <button id="fill-all-fields" class="btn-success">Fill All Fields</button>
+    <button id="add-current-site" class="btn-secondary">Add Site to Auto-Fill</button>
+  </div>
+
+  <!-- Survey tracking section -->
+  <div class="survey-section">
+    <h3>📋 Survey Tracking</h3>
+    <div class="survey-actions">
+      <button id="mark-current-completed" class="btn-warning">Mark Page Complete</button>
+      <button id="survey-tracking" class="btn-secondary">View Surveys</button>
+    </div>
+    <div class="survey-actions" style="margin-top: 8px;">
+      <button id="test-survey-detection" class="btn-secondary">🧪 Test Detection</button>
+      <button id="field-reliability" class="btn-secondary">📊 Field Reliability</button>
+      <button id="debug-extension" class="btn-warning">🔧 Debug</button>
+    </div>
+  </div>
+
+  <div id="field-form" class="field-form" data-edit-index="-1">
+    <!-- Domain Restriction Info -->
+    <div id="domain-restriction-info" class="domain-restriction-info" style="display: none;">
+      <div class="restriction-header">
+        <span class="restriction-icon">[DOMAIN]</span>
+        <span class="restriction-text">This field will only work on: <strong id="restriction-domain"></strong></span>
+        <button id="remove-restriction" class="remove-restriction-btn" title="Allow on all domains">X</button>
+      </div>
+      <div class="restriction-note">You can change this in Settings > Domain Settings later</div>
+    </div>
+
+    <div class="form-group">
+      <label for="field-selector">
+        Selector:
+        <span id="selector-options-badge" class="selector-options-badge" style="display: none;">Options Available</span>
+      </label>
+      <div class="selector-input-container">
+        <input type="text" id="field-selector" placeholder="Enter selector or use Select Button" class="input-with-validation">
+        <div id="selector-validation-indicator" class="selector-validation-indicator"></div>
+        <div id="selector-validation-tooltip" class="selector-validation-tooltip"></div>
+      </div>
+
+    </div>
+
+    <div class="form-group">
+      <label for="selector-type">
+        Selector Type:
+      </label>
+      <div id="selector-type-help" style="font-size: 11px; color: #666; margin-bottom: 5px; padding: 5px; background: #f0f8ff; border-radius: 3px; display: none;"></div>
+      <select id="selector-type">
+        <option value="css">CSS Selector</option>
+        <option value="id">ID</option>
+        <option value="name">Name</option>
+        <option value="xpath">XPath</option>
+        <option value="label">Label Text</option>
+        <option value="placeholder">Placeholder</option>
+        <option value="aria-label">ARIA Label</option>
+        <option value="data-attribute">Data Attribute</option>
+        <option value="closest-text">Closest Text</option>
+        <!-- Regex selector types -->
+        <option value="regex-label">Regex Label Match</option>
+        <option value="regex-id">Regex ID Match</option>
+        <option value="regex-name">Regex Name Match</option>
+        <option value="regex-class">Regex Class Match</option>
+        <option value="regex-placeholder">Regex Placeholder Match</option>
+        <option value="regex-content">Regex Content Match</option>
+        <option value="regex-value">Regex Value Match</option>
+        <option value="regex-attr">Regex Attribute Match</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="field-value">Value:</label>
+      <input type="text" id="field-value" placeholder="Value to fill">
+    </div>
+
+    <!-- Hidden element to store all selectors data -->
+    <div id="all-selectors" data-selectors="" class="hidden"></div>
+
+    <!-- Selector options display -->
+    <div id="selector-options" class="selector-options">
+      <div class="selector-options-header" style="font-size: 12px; color: #666; margin-bottom: 8px;">
+        💡 These are different ways to select the same element. The filter below searches this list.
+      </div>
+    </div>
+
+    <!-- Regex pattern tester -->
+    <div id="regex-tester" class="regex-tester" style="display: none;">
+      <div style="font-size: 12px; font-weight: bold; margin-bottom: 8px; color: #4285f4;">🧪 Live Regex Pattern Tester</div>
+      <div style="font-size: 11px; margin-bottom: 10px; color: #666;">
+        Test your pattern against elements on the current page in real-time.
+      </div>
+      <div class="form-group">
+        <button id="test-regex-pattern" class="btn-secondary" style="width: 100%;">Test Pattern on Current Page</button>
+      </div>
+      <div id="regex-test-results" style="margin-top: 10px; padding: 10px; background: #f9f9f9; border-radius: 5px; display: none;">
+        <div id="regex-match-count" style="font-weight: bold; margin-bottom: 5px;"></div>
+        <div id="regex-matches-preview" style="max-height: 150px; overflow-y: auto;"></div>
+      </div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; margin-top: 10px;">
+      <button id="add-field" class="btn-success">Add Field</button>
+      <button id="select-field" class="btn-secondary">Select Field on Page</button>
+    </div>
+  </div>
+
+  <button id="detect-fields" class="btn-success" style="margin-bottom: 10px;">Detect Fields</button>
+
+  <!-- Moved grey buttons above Saved Fields section -->
+  <div class="action-buttons" style="margin-bottom: 15px; display: flex; justify-content: space-between; flex-wrap: wrap;">
+    <button id="domain-settings" class="btn-secondary">Settings</button>
+    <button id="export-syncthing" class="btn-secondary">Export</button>
+    <button id="import-syncthing" class="btn-secondary">Import</button>
+    <button id="field-diagnostics" class="btn-secondary">Diagnostics</button>
+  </div>
+
+  <!-- Manual file import section -->
+  <div style="margin-bottom: 15px; text-align: center;">
+    <button id="manual-import-btn" class="btn-secondary" style="font-size: 12px;">📁 Manual File Import</button>
+    <input type="file" id="import-file" accept=".json" style="display: none;">
+    <div style="font-size: 11px; color: #666; margin-top: 5px;">For importing downloaded settings files</div>
+  </div>
+
+  <h3>Saved Fields</h3>
+  <div class="fields-list" id="fields-list">
+    <!--Fields will be loaded here dynamically -->
+  </div>
+
+  <!-- Notification Element -->
+  <div id="notification" class="notification"></div>
+
+
+  <!-- Detected Fields Dialog -->
+  <div id="detected-fields-dialog" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">Detected Fields</h2>
+        <span class="close">&times;</span>
+      </div>
+
+      <div class="form-group">
+        <p>Select the fields you want to add:</p>
+        <div id="detected-fields-list" class="detected-fields-list">
+          <!-- Detected fields will be added here -->
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="add-selected-fields" class="btn-success">Add Selected</button>
+        <button id="add-all-fields" class="btn-success">Add All</button>
+        <button id="cancel-detected-fields" class="btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Note: Survey Tracking Modal is now dynamically created in popup.js -->
+
+  <script src="popup.js"></script>
+</body>
+</html>
