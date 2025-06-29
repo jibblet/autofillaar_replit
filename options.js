@@ -120,6 +120,9 @@ document.addEventListener('DOMContentLoaded', function() {
   // Add filtering styles
   addFilteringStyles();
 
+  // Initialize dark mode
+  initializeDarkMode();
+
   // Initialize tabs
   initializeTabs();
 
@@ -1219,6 +1222,16 @@ function removeField(index) {
   }
 }
 
+// Initialize dark mode
+function initializeDarkMode() {
+  chrome.storage.local.get('options', function(data) {
+    const options = data.options || {};
+    if (options.darkMode) {
+      document.body.classList.add('dark-mode');
+    }
+  });
+}
+
 // Load settings
 function loadSettings() {
   chrome.storage.local.get('options', function(data) {
@@ -1226,18 +1239,21 @@ function loadSettings() {
       autoFillDelay: 1000,
       notifyOnAutoFill: true,
       debugMode: false,
-      iframeSupportEnabled: false
+      iframeSupportEnabled: false,
+      darkMode: false
     };
 
     const defaultDelayElement = document.getElementById('default-delay');
     const notificationsEnabledElement = document.getElementById('notifications-enabled');
     const debugModeElement = document.getElementById('debug-mode');
     const iframeSupportElement = document.getElementById('iframe-support-enabled');
+    const darkModeElement = document.getElementById('dark-mode-enabled');
 
     if (defaultDelayElement) defaultDelayElement.value = options.autoFillDelay;
     if (notificationsEnabledElement) notificationsEnabledElement.checked = options.notifyOnAutoFill;
     if (debugModeElement) debugModeElement.checked = options.debugMode;
     if (iframeSupportElement) iframeSupportElement.checked = options.iframeSupportEnabled;
+    if (darkModeElement) darkModeElement.checked = options.darkMode;
   });
 }
 
@@ -1247,6 +1263,7 @@ function saveSettings() {
   const notificationsEnabledElement = document.getElementById('notifications-enabled');
   const debugModeElement = document.getElementById('debug-mode');
   const iframeSupportElement = document.getElementById('iframe-support-enabled');
+  const darkModeElement = document.getElementById('dark-mode-enabled');
 
   if (!defaultDelayElement || !notificationsEnabledElement || !debugModeElement) {
     return;
@@ -1256,13 +1273,24 @@ function saveSettings() {
     autoFillDelay: parseInt(defaultDelayElement.value),
     notifyOnAutoFill: notificationsEnabledElement.checked,
     debugMode: debugModeElement.checked,
-    iframeSupportEnabled: iframeSupportElement ? iframeSupportElement.checked : false
+    iframeSupportEnabled: iframeSupportElement ? iframeSupportElement.checked : false,
+    darkMode: darkModeElement ? darkModeElement.checked : false
   };
+
+  // Apply dark mode immediately
+  if (options.darkMode) {
+    document.body.classList.add('dark-mode');
+  } else {
+    document.body.classList.remove('dark-mode');
+  }
 
   chrome.storage.local.set({options: options}, function() {
     let message = 'Settings saved!';
     if (options.iframeSupportEnabled) {
       message += ' Iframe support enabled.';
+    }
+    if (options.darkMode) {
+      message += ' Dark mode enabled.';
     }
     showNotification(message);
   });
@@ -1792,6 +1820,18 @@ function setupEventListeners() {
   const importSurveyFileElement = document.getElementById('import-survey-file');
   if (importSurveyFileElement) {
     importSurveyFileElement.addEventListener('change', importSurveyHistory);
+  }
+
+  // Dark mode toggle
+  const darkModeElement = document.getElementById('dark-mode-enabled');
+  if (darkModeElement) {
+    darkModeElement.addEventListener('change', function() {
+      if (this.checked) {
+        document.body.classList.add('dark-mode');
+      } else {
+        document.body.classList.remove('dark-mode');
+      }
+    });
   }
 
   const valueContainsInput = document.getElementById('filter-value-contains');

@@ -3,6 +3,7 @@ run = "node index.js"
 
 [nix]
 channel = "stable-24_05"
+packages = ["openssh"]
 
 [deployment]
 run = ["sh", "-c", "node index.js"]

@@ -82,10 +82,70 @@ function sendTabMessage(tabId, message, retries = 2) {
 // Survey detection now only works on explicitly configured domains
 // No more generic pattern matching to prevent false positives
 
-// Listen for messages from popup.js or content script
+// Message Router System
+const MessageHandlers = {
+  // Field selection handlers
+  checkFieldSelection: () => ({
+    fieldSelectionData: fieldSelectionData,
+    selectionActive: selectionActive
+  }),
+
+  setFieldSelection: (request) => {
+    selectionActive = !!request.data;
+    if (request.data === null) {
+      fieldSelectionData = null;
+    }
+    return {status: 'success'};
+  },
+
+  storeFieldSelection: (request) => {
+    fieldSelectionData = request.data;
+    selectionActive = false;
+    return {status: 'success'};
+  },
+
+  // Survey handlers
+  getSurveyStats: async () => {
+    const data = await StorageManager.get(['completedSurveys', 'inProgressSurveys']);
+    const completed = data.completedSurveys || [];
+    const inProgress = data.inProgressSurveys || [];
+    
+    return {
+      status: 'success',
+      stats: {
+        totalCompleted: completed.length,
+        inProgress: inProgress.length,
+        recentSurveys: completed.slice(0, 10),
+        duplicatesAvoided: completed.reduce((sum, survey) => sum + (survey.duplicateEncounters || 0), 0)
+      }
+    };
+  },
+
+  markSurveyCompleted: async (request) => {
+    const { surveyId } = request;
+    await moveFromInProgressToCompleted(surveyId);
+    return {status: 'success'};
+  }
+};
+
+// Unified message listener
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+  const handler = MessageHandlers[request.action];
   
-  // Field selection functionality
+  if (handler) {
+    const result = handler(request, sender);
+    if (result instanceof Promise) {
+      result.then(sendResponse).catch(error => 
+        sendResponse({status: 'error', message: error.message})
+      );
+      return true; // Keep channel open for async response
+    } else {
+      sendResponse(result);
+    }
+    return;
+  }
+
+  // Legacy handlers for complex operations
   if (request.action === 'checkFieldSelection') {
     sendResponse({
       fieldSelectionData: fieldSelectionData,
@@ -1770,6 +1830,39 @@ function showSurveyAutofilledNotification(tabId, surveyData) {
     });
   });
 }
+
+// Consolidated Storage Manager
+const StorageManager = {
+  async get(keys) {
+    return new Promise(resolve => {
+      chrome.storage.local.get(keys, resolve);
+    });
+  },
+
+  async set(data) {
+    return new Promise(resolve => {
+      chrome.storage.local.set(data, resolve);
+    });
+  },
+
+  async updateFields(updateFn) {
+    const data = await this.get('fields');
+    const fields = updateFn(data.fields || []);
+    await this.set({fields});
+    return fields;
+  },
+
+  async updateDomains(updateFn) {
+    const data = await this.get('domains');
+    const domains = updateFn(data.domains || []);
+    await this.set({domains});
+    return domains;
+  },
+
+  async getSurveyData() {
+    return await this.get(['completedSurveys', 'inProgressSurveys']);
+  }
+};
 
 // Enhanced logging with pattern learning and performance tracking
 function logAutoFill(domain, results) {

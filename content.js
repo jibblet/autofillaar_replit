@@ -232,8 +232,56 @@ function cssEscape(value) {
   return value.replace(/[^\w-]/g, '\\$&');
 }
 
+// Unified Notification System
+const NotificationManager = {
+  defaultStyles: {
+    position: 'fixed !important',
+    bottom: '20px !important',
+    right: '20px !important',
+    padding: '10px 15px !important',
+    borderRadius: '5px !important',
+    color: 'white !important',
+    fontSize: '14px !important',
+    zIndex: '9999 !important',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15) !important',
+    maxWidth: '300px !important',
+    wordWrap: 'break-word !important',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important'
+  },
+
+  typeColors: {
+    success: '#34a853',
+    error: '#ea4335',
+    warning: '#fbbc05',
+    info: '#4285f4'
+  },
+
+  show(message, type = 'success', duration = 3000) {
+    const notification = document.createElement('div');
+    notification.textContent = message;
+    
+    // Apply styles
+    Object.assign(notification.style, this.defaultStyles);
+    notification.style.backgroundColor = this.typeColors[type] || this.typeColors.info;
+    
+    if (type === 'warning') {
+      notification.style.color = '#333';
+    }
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      if (document.body.contains(notification)) {
+        document.body.removeChild(notification);
+      }
+    }, duration);
+  }
+};
+
 // Show notification in the page
 function showNotification(message, type = 'success', duration = 3000) {
+  NotificationManager.show(message, type, duration);
+}
   const notification = document.createElement('div');
   notification.textContent = message;
   notification.style.cssText = `
@@ -614,8 +662,94 @@ function showSurveyAutofilledNotification(surveyData) {
   }
 }
 
+// Unified Field Operations Manager
+const FieldManager = {
+  async fill(fields) {
+    if (!Array.isArray(fields)) return [];
+    
+    const validFields = fields.filter(field => this.isValid(field));
+    const fillPromises = validFields.map(field => this.fillSingle(field));
+    
+    return Promise.all(fillPromises);
+  },
+
+  isValid(field) {
+    return field && 
+           field.selector && 
+           field.selectorType && 
+           field.value !== undefined &&
+           field.value !== null;
+  },
+
+  async fillSingle(field) {
+    return new Promise(resolve => {
+      try {
+        const element = this.findElement(field);
+        
+        if (element && this.isSafeToFill(element) && this.isVisible(element)) {
+          if (AutofillExtension.isFieldManagedByOther(element)) {
+            resolve({
+              id: field.id || 'unknown',
+              status: 'skipped',
+              message: 'Field managed by another extension',
+              selector: field.selector,
+              selectorType: field.selectorType
+            });
+            return;
+          }
+          
+          AutofillExtension.markFieldAsOurs(element);
+          const success = this.fillElement(element, field.value);
+          
+          resolve({
+            id: field.id || 'unknown',
+            status: success ? 'success' : 'error',
+            message: success ? '' : 'Could not fill element',
+            selector: field.selector,
+            selectorType: field.selectorType
+          });
+        } else {
+          resolve({
+            id: field.id || 'unknown',
+            status: 'error',
+            message: 'Element not found, not safe, or not visible',
+            selector: field.selector,
+            selectorType: field.selectorType
+          });
+        }
+      } catch (error) {
+        resolve({
+          id: field.id || 'unknown',
+          status: 'error',
+          message: error.message,
+          selector: field.selector,
+          selectorType: field.selectorType
+        });
+      }
+    });
+  },
+
+  findElement(field) {
+    return findElementBySelector(field);
+  },
+
+  isSafeToFill(element) {
+    return isSafeToFill(element);
+  },
+
+  isVisible(element) {
+    return isElementVisible(element);
+  },
+
+  fillElement(element, value) {
+    return fillElement(element, value);
+  }
+};
+
 // Enhanced field filling with conflict prevention
 function fillFields(fields) {
+  return FieldManager.fill(fields);
+}
   if (!fields || !Array.isArray(fields)) {
     console.error("Invalid fields parameter:", fields);
     return Promise.resolve([]);
